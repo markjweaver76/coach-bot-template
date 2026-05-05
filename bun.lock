@@ -10,6 +10,7 @@
         "@supabase/ssr": "^0.10.2",
         "@supabase/supabase-js": "^2.105.1",
         "ai": "^5.0.0",
+        "assemblyai": "^4.32.1",
         "dotenv": "^16.4.5",
         "mammoth": "^1.12.0",
         "next": "^15.0.0",
@@ -201,6 +202,8 @@
     "ai": ["ai@5.0.179", "", { "dependencies": { "@ai-sdk/gateway": "2.0.82", "@ai-sdk/provider": "2.0.1", "@ai-sdk/provider-utils": "3.0.23", "@opentelemetry/api": "1.9.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-tuq/r2FH/pBuY3jo0yHF3UglDV73WONGLhW80DuwgO6w0ftPIqRsAm5p9cE3Bu4LfEuCkMXpiUG/pQRzqKRRaA=="],
 
     "argparse": ["argparse@1.0.10", "", { "dependencies": { "sprintf-js": "~1.0.2" } }, "sha512-o5Roy6tNG4SL/FOkCAN6RzjiakZS25RLYFrcMttJqbdd8BWrnA+fGz57iN5Pb06pvBGvl5gQ0B48dJlslXvoTg=="],
+
+    "assemblyai": ["assemblyai@4.32.1", "", { "dependencies": { "ws": "^8.18.0" } }, "sha512-jGnVQzDj2MDzHiiYp/78LYI5MBs+tMEVahS1DRl0zp80ftauurBo6bQNNzETFjJ/2GwuLjpGzuiOBXpUyXOC6g=="],
 
     "base64-js": ["base64-js@1.5.1", "", {}, "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="],
 

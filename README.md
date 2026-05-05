@@ -60,12 +60,23 @@ Run the setup once against your Supabase project (creates tables, enables pgvect
 bun run db:init
 ```
 
-### 6. Ingest your training content
+### 6a. (Optional) Transcribe video/audio
+If your training content is in video or audio files, transcribe them first:
+```bash
+bun run transcribe ./path/to/your/training-folder
+```
+This uses AssemblyAI (~$0.65/hour audio) and writes a `<filename>.transcript.txt` next to each source file. Requires `ASSEMBLYAI_API_KEY` in `.env.local` — sign up at https://www.assemblyai.com (free tier = 5 hours/month). Idempotent — safe to re-run; skips files already transcribed.
+
+Supports: `.mp4`, `.mov`, `.m4a`, `.mp3`, `.wav`, `.webm`, `.mkv`, `.aac`, `.flac`, `.ogg`, `.m4v`, `.avi`.
+
+### 6b. Ingest your training content
 ```bash
 bun run ingest ./path/to/your/training-docs
 ```
 
-Supported formats: `.txt`, `.md`, `.pdf`, `.docx`, `.vtt`. Use `--max-depth=1` to skip subfolders.
+Supported formats: `.txt`, `.md`, `.pdf`, `.docx`, `.vtt`. The ingest script picks up `.transcript.txt` files automatically — anything from step 6a is included.
+
+Use `--max-depth=1` to skip subfolders.
 
 ### 7. Run locally
 ```bash
