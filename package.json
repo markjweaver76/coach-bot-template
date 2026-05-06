@@ -9,6 +9,7 @@
     "lint": "next lint",
     "ingest": "tsx scripts/ingest.ts",
     "transcribe": "tsx scripts/transcribe.ts",
+    "derive-persona": "tsx scripts/derive-persona.ts",
     "db:init": "tsx scripts/init-supabase.ts"
   },
   "dependencies": {

@@ -78,6 +78,17 @@ Supported formats: `.txt`, `.md`, `.pdf`, `.docx`, `.vtt`. The ingest script pic
 
 Use `--max-depth=1` to skip subfolders.
 
+### 6c. (Recommended) Auto-derive your bot's persona from training content
+```bash
+bun run derive-persona
+```
+
+Pulls 12 random chunks from your ingested corpus, uses gpt-5.5 to capture YOUR voice (tone, signature phrases, energy), combines that with the standard constraint scaffolding, and writes the result to `BRAND.personaPrompt` in `lib/brand.ts`. The default constraints (never break character, off-topic redirect, fallback when no answer) are preserved — only the voice/tone/identity sections are derived from your content.
+
+Re-run any time your corpus changes substantially. Most coaches can't articulate their own voice cleanly — your training material is the better source of truth.
+
+You can still hand-tweak `BRAND.personaPrompt` after the script runs if anything feels off.
+
 ### 7. Run locally
 ```bash
 bun run dev
