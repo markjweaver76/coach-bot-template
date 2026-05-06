@@ -227,6 +227,30 @@ Run `bun run transcribe <path>` (with `--max-depth=1` if they only want top-leve
 Run `bun run ingest <path>` for them. Show progress as it streams. When done:
 > "Ingested [N] chunks from [M] files. Your bot now has access to your full corpus."
 
+#### Phase 4.5 — Derive the bot's voice from the corpus (recommended)
+
+This is one of the most valuable steps and it only takes 10 seconds. **Don't skip it unless the user explicitly opts out.**
+
+> "Now I'm going to listen to your training material and draft your bot's voice automatically — capturing your actual tone, signature phrases, and energy. This is way better than asking you to describe how you sound; most coaches can't articulate their own voice cleanly. Your training content can.
+>
+> One quick question: what would you like your bot to call your audience? E.g. 'members of The Vortex' for a community-style bot, 'my clients' for a 1:1 coach, 'students' for a teacher. (Used in the persona prompt — 'you are coaching X'.)"
+
+Then update `BRAND.audienceCollective` in `lib/brand.ts` based on their answer (and `BRAND.audienceLabel` to a singular form, e.g. "Vortex member" / "client" / "student").
+
+Then run:
+```bash
+cd <project-path> && bun run derive-persona
+```
+
+This pulls 12 random chunks from their `documents` table, asks gpt-5.5 to write a Role paragraph quoting 2-3 of their actual signature phrases, and writes the full persona prompt back to `BRAND.personaPrompt` — keeping the 4 standard constraints verbatim.
+
+When done, summarize what was extracted:
+> "Done. Your bot's voice is now: '[short summary of the tone descriptors and signature phrases the LLM picked up].' Want me to read you the full persona, or move on to test it?"
+
+If they want to tweak: read the persona aloud, ask what to adjust, edit `lib/brand.ts` directly. If they're happy: move on.
+
+If the persona feels off after testing in Phase 5, you can re-run `bun run derive-persona` any time — different random samples produce different drafts.
+
 ### Phase 5 — Test locally
 
 > "Let's test your bot. I'll start the dev server now." [run `bun run dev` in background, capture the URL it prints]
