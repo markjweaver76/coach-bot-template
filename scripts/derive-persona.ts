@@ -2,10 +2,10 @@
  * Auto-derive the bot's persona prompt from samples of the coach's actual
  * training content.
  *
- * Run AFTER `bun run ingest`. Reads ~10 random chunks from the documents
- * table, asks gpt-5.5 to draft a persona prompt in the speaker's voice,
- * combines that with the standard constraint scaffolding, and writes the
- * result back to `lib/brand.ts` (BRAND.personaPrompt).
+ * Run AFTER `bun run ingest`. Reads ~12 random chunks from the documents
+ * table, asks gpt-5.5 to draft the Role paragraph in the speaker's voice,
+ * combines that with the standard 4 constraints, and writes the result back
+ * to `lib/brand.ts` (BRAND.personaPrompt).
  *
  * Usage:
  *   bun run derive-persona
@@ -24,56 +24,52 @@ config();
 const SAMPLE_COUNT = 12;
 const BRAND_FILE = 'lib/brand.ts';
 
-if (!process.env.DATABASE_URL) {
-  console.error('DATABASE_URL not set. Run setup first.');
-  process.exit(1);
-}
-if (!process.env.OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY not set.');
-  process.exit(1);
-}
+async function main() {
+  if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL not set. Run setup first.');
+    process.exit(1);
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('OPENAI_API_KEY not set.');
+    process.exit(1);
+  }
 
-const sql = postgres(process.env.DATABASE_URL, { ssl: 'require' });
+  const sql = postgres(process.env.DATABASE_URL, { ssl: 'require' });
 
-// Pull current BRAND fields so we can pass name/audience to the LLM and update
-// the right field afterward. We read the file as text and parse it loosely
-// rather than importing — importing the .ts file at script time is awkward.
-const brandSrc = await readFile(BRAND_FILE, 'utf8');
-function readBrandField(field: string): string | null {
-  // Match  field: '...'  or  field: "..."  or  field: `...`
-  const re = new RegExp(`\\b${field}\\s*:\\s*(['"\`])([\\s\\S]*?)\\1`);
-  const m = brandSrc.match(re);
-  return m ? m[2] : null;
-}
-const name = readBrandField('name') ?? 'Your Coach';
-const tagline = readBrandField('tagline') ?? '';
-const audienceLabel = readBrandField('audienceLabel') ?? 'member';
+  try {
+    // Read current BRAND fields so we can pass name/audience to the LLM.
+    const brandSrc = await readFile(BRAND_FILE, 'utf8');
+    const readBrandField = (field: string): string | null => {
+      const re = new RegExp(`\\b${field}\\s*:\\s*(['"\`])([\\s\\S]*?)\\1`);
+      const m = brandSrc.match(re);
+      return m ? m[2] : null;
+    };
+    const name = readBrandField('name') ?? 'Your Coach';
+    const tagline = readBrandField('tagline') ?? '';
+    const audienceLabel = readBrandField('audienceLabel') ?? 'member';
 
-// Sample chunks. We use TABLESAMPLE if the table is big, otherwise fall back
-// to ORDER BY random() — fine for a one-shot script.
-console.log(`Sampling ${SAMPLE_COUNT} chunks from your training corpus...`);
-const totalRow = await sql<Array<{ n: number }>>`SELECT COUNT(*)::int AS n FROM documents`;
-const total = totalRow[0].n;
-if (total === 0) {
-  console.error(
-    'No documents found in your training corpus yet. Run `bun run ingest <folder>` first.',
-  );
-  await sql.end();
-  process.exit(1);
-}
-const samples = await sql<Array<{ source: string; content: string }>>`
-  SELECT source, content
-  FROM documents
-  ORDER BY random()
-  LIMIT ${SAMPLE_COUNT}
-`;
-console.log(`  Pulled from ${total} total chunks across the corpus.`);
+    console.log(`Sampling ${SAMPLE_COUNT} chunks from your training corpus...`);
+    const totalRow = await sql<Array<{ n: number }>>`SELECT COUNT(*)::int AS n FROM documents`;
+    const total = totalRow[0].n;
+    if (total === 0) {
+      console.error(
+        'No documents found in your training corpus yet. Run `bun run ingest <folder>` first.',
+      );
+      process.exit(1);
+    }
+    const samples = await sql<Array<{ source: string; content: string }>>`
+      SELECT source, content
+      FROM documents
+      ORDER BY random()
+      LIMIT ${SAMPLE_COUNT}
+    `;
+    console.log(`  Pulled from ${total} total chunks across the corpus.`);
 
-const samplesText = samples
-  .map((s, i) => `--- SAMPLE ${i + 1} (from ${s.source}) ---\n${s.content}`)
-  .join('\n\n');
+    const samplesText = samples
+      .map((s, i) => `--- SAMPLE ${i + 1} (from ${s.source}) ---\n${s.content}`)
+      .join('\n\n');
 
-const SYSTEM = `You are a prompt-writing expert. Your job is to take samples of a coach's actual spoken or written content and draft a persona prompt for an AI bot that captures their voice naturally.
+    const SYSTEM = `You are a prompt-writing expert. Your job is to take samples of a coach's actual spoken or written content and draft a persona prompt for an AI bot that captures their voice naturally.
 
 The persona will be used as the system prompt for an AI coaching bot. The structure is FIXED — you must produce exactly this format with two sections:
 
@@ -108,7 +104,7 @@ Return ONLY the persona prompt as plain text — starting with "### Role" and en
 
 Aim for 200-350 words total. The Role paragraph should be 4-7 sentences.`;
 
-const USER = `Coach name: ${name}
+    const USER = `Coach name: ${name}
 Bot tagline: ${tagline}
 Audience (term for their members): ${audienceLabel}
 
@@ -118,43 +114,47 @@ ${samplesText}
 
 Now write the persona prompt for ${name}, in the exact format I specified. The Role paragraph should capture how they ACTUALLY sound based on the samples — quote specific phrases. Don't generalize.`;
 
-console.log('Drafting persona prompt with gpt-5.5...');
-const { text } = await generateText({
-  model: openai('gpt-5.5'),
-  system: SYSTEM,
-  prompt: USER,
+    console.log('Drafting persona prompt with gpt-5.5...');
+    const { text } = await generateText({
+      model: openai('gpt-5.5'),
+      system: SYSTEM,
+      prompt: USER,
+    });
+
+    const persona = text.trim();
+
+    if (persona.length < 200 || !persona.toLowerCase().includes(name.toLowerCase())) {
+      console.error('\nPersona output looks suspicious — not writing to lib/brand.ts.');
+      console.error('Generated text:\n');
+      console.error(persona);
+      process.exit(1);
+    }
+
+    const personaRe = /personaPrompt\s*:\s*`[\s\S]*?`/m;
+    if (!personaRe.test(brandSrc)) {
+      console.error(
+        "Couldn't find personaPrompt in lib/brand.ts — has the file been renamed or refactored? Aborting.",
+      );
+      process.exit(1);
+    }
+
+    // Escape backticks and ${ in the new persona so they don't break the template literal.
+    const escaped = persona.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+    const newSrc = brandSrc.replace(personaRe, `personaPrompt: \`${escaped}\``);
+    await writeFile(BRAND_FILE, newSrc, 'utf8');
+
+    console.log(`\n✓ Wrote ${persona.length} chars to BRAND.personaPrompt in ${BRAND_FILE}.\n`);
+    console.log('Generated persona:\n');
+    console.log('─'.repeat(60));
+    console.log(persona);
+    console.log('─'.repeat(60));
+    console.log('\nReview the prompt in lib/brand.ts. Tweak by hand if anything feels off.');
+  } finally {
+    await sql.end();
+  }
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });
-
-const persona = text.trim();
-
-// Sanity check: does it look like a reasonable persona prompt?
-if (persona.length < 200 || !persona.toLowerCase().includes(name.toLowerCase())) {
-  console.error('\nPersona output looks suspicious — not writing to lib/brand.ts.');
-  console.error('Generated text:\n');
-  console.error(persona);
-  await sql.end();
-  process.exit(1);
-}
-
-// Splice the new persona into lib/brand.ts. We look for the existing
-// `personaPrompt: \`...\`` block and replace it.
-const personaRe = /personaPrompt\s*:\s*`[\s\S]*?`/m;
-if (!personaRe.test(brandSrc)) {
-  console.error(
-    "Couldn't find personaPrompt in lib/brand.ts — has the file been renamed or refactored? Aborting.",
-  );
-  await sql.end();
-  process.exit(1);
-}
-
-// Escape backticks and ${ in the new persona so they don't break the template literal.
-const escaped = persona.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
-const newSrc = brandSrc.replace(personaRe, `personaPrompt: \`${escaped}\``);
-await writeFile(BRAND_FILE, newSrc, 'utf8');
-
-console.log(`\n✓ Wrote ${persona.length} chars to BRAND.personaPrompt in ${BRAND_FILE}.`);
-console.log('\nPreview (first 600 chars):\n');
-console.log(persona.slice(0, 600) + (persona.length > 600 ? '\n...' : ''));
-console.log('\nReview the full prompt in lib/brand.ts. Tweak by hand if anything feels off.');
-
-await sql.end();
