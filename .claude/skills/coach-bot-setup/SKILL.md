@@ -244,33 +244,165 @@ If anything goes wrong, troubleshoot. Common issues are in [references/troublesh
 
 If the response feels generic (not on-brand): offer to tighten the persona prompt. They tell you what's off; you edit `lib/brand.ts`. They send another message. Iterate.
 
-### Phase 6 — Deploy to Vercel
+### Phase 6 — Ship it live (GitHub + Vercel + custom domain)
 
-This is the only phase with mandatory browser interaction (Vercel login).
+Six sub-steps. Tell the user upfront: "We'll push your code to your own GitHub repo (so it's backed up and Vercel can auto-deploy on every change), connect Vercel, set environment variables, deploy, optionally point a custom domain at it, and finalize Supabase auth URLs. About 15 minutes."
 
-> "Time to put your bot online. We're using Vercel — it's free for traffic at your scale.
+Three browser interactions are unavoidable here: GitHub auth, Vercel auth, and (if they want a custom domain) DNS records at their registrar. Everything else Claude runs.
+
+#### 6a — Push code to their own GitHub repo
+
+> "First we put your code on GitHub — under YOUR account, not mine. This means you own it, you can update the persona or training content any time, and Vercel can auto-deploy when you push changes.
 >
-> 1. Sign up at https://vercel.com (use GitHub login if possible — saves time later).
-> 2. Tell me when you're signed in."
+> Do you have a GitHub account? If not, sign up at https://github.com/signup (free, 60 seconds)."
 
-Then run `vercel link` with appropriate non-interactive flags or walk them through the prompts. The first time they run it, Vercel will open a browser to authenticate. Tell them: "A browser window will open — click 'Continue' to authorize. Then come back here."
+Once they have an account, check whether the GitHub CLI (`gh`) is installed and authenticated:
+```bash
+gh auth status
+```
 
-After link succeeds, they need env vars in Vercel. Two paths:
+- If `gh` is not installed: `brew install gh` (or guide them to https://cli.github.com if they don't have Homebrew). Don't do this yourself unless you confirm Homebrew is available.
+- If `gh` is installed but not authed: `gh auth login`. This is **interactive** — it opens a browser for OAuth and asks them to enter a one-time code shown in the terminal. Tell them: "A browser window will open. Authorize GitHub Code, then come back here." Watch for "Logged in as <user>" before continuing.
 
-**Path A — automated (preferred)**: `vercel env add` for each variable. You can pipe values in.
+Once authed, ask: "What do you want to call the GitHub repo? (e.g. `shosh-ai`, `my-coach-bot`, `marcus`.) Most coaches keep it private to start so the persona prompt stays internal."
 
-**Path B — manual fallback**: tell them to go to Vercel dashboard → their project → Settings → Environment Variables → add each one from `.env.local`. Apply to BOTH Production and Preview.
+Then run via Bash from the project directory:
+```bash
+cd <project-path> && gh repo create <repo-name> --source=. --private --push
+```
 
-Run `vercel deploy --prod`. Capture the URL it prints.
+This creates the repo on GitHub under their account, sets it as the `origin` remote, and pushes the current code. Confirm with `gh repo view --web` printing the URL (don't actually open it; just capture the URL to show them).
 
-> "Your bot is live at https://[url]. One more thing before clients can use it..."
+If they want a public repo instead, swap `--private` for `--public`.
 
-Walk them through Supabase Site URL update:
-> "Go back to Supabase → Authentication → URL Configuration. Set 'Site URL' to https://[url]. Add the same as a Redirect URL. Click Save. (Without this, the email confirmation links in production will break.)"
+> "Your code is now at https://github.com/<their-handle>/<repo-name>. From now on, any time you want to update your bot, I'll push the change here and Vercel will auto-rebuild."
 
-Test the deployed app: have them sign up with a fresh email, send a message, confirm it works.
+#### 6b — Connect Vercel to the repo
 
-If it works in dev but not prod, 95% of the time it's a missing env var in Vercel.
+> "Now Vercel — it's free for any traffic level you'll see for the first year+ of clients.
+>
+> 1. Go to https://vercel.com/signup
+> 2. Sign in with GitHub (this is important — it lets Vercel auto-deploy your repo).
+> 3. Tell me when you're signed in."
+
+Once they confirm:
+
+```bash
+cd <project-path> && vercel link
+```
+
+This is interactive — Vercel opens a browser for auth (first time only), then asks for project name, scope, etc. Walk them through the prompts:
+- **Set up and deploy**: Y
+- **Scope** (which Vercel team/account): pick their personal account
+- **Link to existing project**: N
+- **Project name**: same as their GitHub repo name is cleanest
+- **Directory**: just hit Enter (current directory)
+- **Modify settings?**: N
+
+If they're stuck on any prompt, paraphrase what it's asking — don't read the literal CLI text.
+
+#### 6c — Push environment variables to Vercel
+
+The `.env.local` values need to be in Vercel for the deployed app to work. Run via Bash:
+
+```bash
+cd <project-path> && cat .env.local | grep -v '^#' | grep -v '^$' | while IFS='=' read -r key value; do
+  echo "$value" | vercel env add "$key" production preview
+done
+```
+
+Or, more reliably, do them one at a time using the Bash tool — read each line of `.env.local`, then for each KEY=VALUE pair run:
+
+```bash
+echo "<value>" | cd <project-path> && vercel env add KEY production preview
+```
+
+**Required env vars** (all from `.env.local`):
+- `DATABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENAI_API_KEY`
+- `ASSEMBLYAI_API_KEY` (only if they set this earlier)
+- `SUPABASE_DB_PASSWORD` (informational; not required at runtime, but harmless to have)
+
+If `vercel env add` is balky (sometimes it is), fall back to: tell the user "Open https://vercel.com/dashboard, click your project, Settings → Environment Variables, paste each one. Apply to both Production AND Preview." — then walk them through one variable at a time.
+
+#### 6d — Initial deploy
+
+```bash
+cd <project-path> && vercel deploy --prod
+```
+
+Capture the URL it prints (e.g. `shosh-ai-abc123.vercel.app`). Save it — you'll use it in 6e and 6f.
+
+> "Your bot is live at https://[url]. One more thing before it'll work for real users — and one optional thing to make it look pro."
+
+#### 6e — Custom domain (optional, recommended)
+
+Ask: "Do you want your bot at a custom domain (like `shosh.livingbrave.com` or `marcus.com`) instead of `[vercel-default-url]`?"
+
+- **No** — skip to 6f.
+- **Yes** — proceed below.
+
+> "Two questions:
+> 1. Do you already own the domain you want to use? (Check at https://[your-domain].com — if it loads anything, you own it.)
+> 2. Are you using the apex (`example.com`) or a subdomain (`shosh.example.com`)? Subdomains are easier — recommended if you have an existing site."
+
+Once they answer, add the domain to Vercel:
+```bash
+cd <project-path> && vercel domains add <their-domain>
+```
+
+Vercel will print one of two things:
+- **Subdomain** (e.g. `shosh.example.com`) → asks them to add a `CNAME` record pointing `shosh` → `cname.vercel-dns.com`
+- **Apex domain** (e.g. `example.com`) → asks them to add an `A` record pointing `@` → `76.76.21.21` (or whatever Vercel returns)
+
+Tell them, in plain English, exactly what to do at their registrar:
+
+> "Open your domain registrar's dashboard (the place you bought the domain — Namecheap, GoDaddy, Cloudflare, etc.). Find the DNS settings for `<domain>`. Add this record:
+>
+> - **Type**: CNAME [or A — whichever Vercel said]
+> - **Name**: shosh [or @ for apex]
+> - **Value**: cname.vercel-dns.com [or the IP Vercel gave]
+> - **TTL**: leave default (or set to 3600)
+>
+> Save. Tell me when it's saved — then we wait ~5 minutes for it to propagate."
+
+After they say it's saved, poll for propagation:
+```bash
+cd <project-path> && vercel domains inspect <their-domain>
+```
+
+When it shows "Verified," tell them: "Your bot is now also live at https://<their-domain>. Both URLs work — the custom one is what you'll share with people."
+
+If after 10 minutes it's still not verified, walk them through checking:
+- Did they save the record?
+- Is the DNS provider (registrar's nameservers) pointing where they think it does?
+- Try `dig <their-domain>` to see what's resolving.
+
+#### 6f — Finalize Supabase auth URLs
+
+Critical — without this, signup confirmation emails will redirect to localhost and break.
+
+Tell them:
+> "Last thing. Your bot's auth (sign up, sign in) needs to know its own URL so confirmation emails point to the right place. I can't do this through the API — you'll need to click through Supabase one more time:
+>
+> 1. Go to https://supabase.com/dashboard/project/[their-ref]/auth/url-configuration
+>    (Or: Supabase dashboard → your project → Authentication → URL Configuration)
+> 2. Set **Site URL** to: `https://[their-domain or vercel-url]`
+> 3. Under **Redirect URLs**, add: `https://[their-domain or vercel-url]/**`
+> 4. Click **Save**.
+>
+> Tell me when done."
+
+(If they have both a custom domain AND want the Vercel URL to keep working, add both to Redirect URLs.)
+
+Once they've saved, the deploy is fully wired. Run a final smoke test:
+
+> "Open `https://[their-domain]` in a fresh browser tab (or private window). Sign up with an email you can check, click the confirmation link, sign in, send a message. If you get a real reply from your bot, you're done."
+
+If anything breaks in production but worked locally, 95% of the time it's a missing env var in Vercel. Re-check `vercel env ls`.
 
 ## Hand-off
 
