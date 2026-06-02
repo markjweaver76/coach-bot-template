@@ -1,0 +1,118 @@
+/* ============================================================
+   Coach Mary — Design Tokens & Brand Fonts
+   Relax. Renew. Recharge.
+   ============================================================ */
+
+@font-face { font-family: 'Playfair Display'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/PlayfairDisplay-Regular.ttf') format('truetype'); }
+@font-face { font-family: 'Playfair Display'; font-weight: 700; font-style: normal; font-display: swap; src: url('/fonts/PlayfairDisplay-Bold.ttf') format('truetype'); }
+@font-face { font-family: 'Playfair Display'; font-weight: 400; font-style: italic; font-display: swap; src: url('/fonts/PlayfairDisplay-Italic.ttf') format('truetype'); }
+
+@font-face { font-family: 'Cormorant Garamond'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/CormorantGaramond-Regular.ttf') format('truetype'); }
+@font-face { font-family: 'Cormorant Garamond'; font-weight: 500; font-style: normal; font-display: swap; src: url('/fonts/CormorantGaramond-Medium.ttf') format('truetype'); }
+@font-face { font-family: 'Cormorant Garamond'; font-weight: 400; font-style: italic; font-display: swap; src: url('/fonts/CormorantGaramond-Italic.ttf') format('truetype'); }
+
+@font-face { font-family: 'Montserrat'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/Montserrat-Regular.ttf') format('truetype'); }
+@font-face { font-family: 'Montserrat'; font-weight: 500; font-style: normal; font-display: swap; src: url('/fonts/Montserrat-Medium.ttf') format('truetype'); }
+@font-face { font-family: 'Montserrat'; font-weight: 600; font-style: normal; font-display: swap; src: url('/fonts/Montserrat-SemiBold.ttf') format('truetype'); }
+@font-face { font-family: 'Montserrat'; font-weight: 700; font-style: normal; font-display: swap; src: url('/fonts/Montserrat-Bold.ttf') format('truetype'); }
+
+@font-face { font-family: 'Yellowtail'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/Yellowtail-Regular.ttf') format('truetype'); }
+@font-face { font-family: 'Allura'; font-weight: 400; font-style: normal; font-display: swap; src: url('/fonts/Allura-Regular.ttf') format('truetype'); }
+
+:root {
+  /* Canvas & surfaces */
+  --cream:        #FAF3E8;
+  --canvas:       #FDF9F1;
+  --surface:      #FFFDF9;
+  --surface-sink: #F4EADB;
+
+  /* Teal — primary brand */
+  --teal:         #4FB1AC;
+  --teal-deep:    #2F7E7A;
+  --teal-ink:     #1F5754;
+  --teal-soft:    #CBE7E3;
+  --teal-mist:    #E6F2F0;
+
+  /* Blush — embrace */
+  --blush:        #EFCFD3;
+  --blush-deep:   #DDA0A8;
+  --blush-ink:    #9C5B62;
+  --blush-soft:   #F8E5E7;
+  --blush-mist:   #FCF1F2;
+
+  /* Coral — warm accent */
+  --coral:        #ED9E7E;
+  --coral-deep:   #CC714F;
+  --coral-soft:   #F8DBCB;
+
+  /* Sage & wood */
+  --sage-soft:    #DDE4D2;
+  --wood:         #C6A079;
+
+  /* Gold — Coach Mary accent */
+  --gold:         #c8a25f;
+  --gold-light:   #f3dba1;
+  --gold-dark:    #a87a3d;
+
+  /* Ink */
+  --ink:          #2C2722;
+  --ink-2:        #5C5249;
+  --ink-3:        #8B8175;
+  --ink-4:        #B6AC9F;
+
+  /* Lines */
+  --line:         #EBE0D0;
+  --line-strong:  #DCCEB9;
+  --line-teal:    #BCDFDB;
+
+  /* Semantic */
+  --danger:       #C9756F;
+  --success:      #7F9A6E;
+
+  /* Fonts */
+  --font-display: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
+  --font-serif:   'Cormorant Garamond', Georgia, serif;
+  --font-script:  'Yellowtail', cursive;
+  --font-sans:    'Montserrat', system-ui, sans-serif;
+
+  /* Radii */
+  --r-sm:   14px;
+  --r-md:   20px;
+  --r-lg:   28px;
+  --r-pill: 999px;
+
+  /* Shadows — warm-tinted, never gray */
+  --sh-sm:    0 2px 8px rgba(80,60,40,0.06);
+  --sh-md:    0 8px 24px rgba(80,60,40,0.08);
+  --sh-lg:    0 18px 48px rgba(80,60,40,0.10);
+  --sh-teal:  0 14px 36px rgba(47,126,122,0.18);
+  --sh-blush: 0 14px 36px rgba(221,160,168,0.22);
+  --sh-inset: inset 0 1px 2px rgba(80,60,40,0.06);
+
+  /* Motion */
+  --ease-calm: cubic-bezier(0.22,0.61,0.36,1);
+  --dur-quick: 220ms;
+  --dur-base:  360ms;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, textarea, button, select {
+  font-family: inherit;
+}
+
+/* Scrollbar — warm, subtle */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; }

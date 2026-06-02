@@ -19,88 +19,106 @@ export function Sidebar({ chats, email }: { chats: ChatListItem[]; email: string
   }
 
   return (
-    <aside
-      style={{
-        width: 260,
-        height: '100vh',
-        background: '#fafafa',
-        borderRight: '1px solid #ececec',
-        padding: '20px 14px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 18,
-        position: 'sticky',
-        top: 0,
-        flexShrink: 0,
-      }}
-    >
+    <aside style={{
+      width: 260,
+      height: '100vh',
+      background: 'var(--canvas)',
+      borderRight: '1px solid var(--line)',
+      padding: '20px 12px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 16,
+      position: 'sticky',
+      top: 0,
+      flexShrink: 0,
+    }}>
+
+      {/* Wordmark */}
+      <div style={{ padding: '8px 10px 4px', textAlign: 'center' }}>
+        {BRAND.logoSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={BRAND.logoSrc} alt={BRAND.name} style={{ width: 120, height: 'auto' }} />
+        ) : (
+          <div>
+            <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 14, letterSpacing: '0.1em', color: 'var(--teal-deep)', textTransform: 'uppercase', lineHeight: 1 }}>
+              {BRAND.name.split(' ').slice(0, -1).join(' ') || BRAND.name}
+            </div>
+            {BRAND.name.split(' ').length > 1 && (
+              <div style={{ fontFamily: 'var(--font-script)', fontSize: 28, color: 'var(--ink)', lineHeight: 0.85, marginTop: 2 }}>
+                {BRAND.name.split(' ').slice(-1)[0]}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* New chat */}
       <Link
         href="/"
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '10px 12px',
-          fontSize: 15,
+          gap: 9,
+          padding: '10px 14px',
+          fontSize: 13,
           fontWeight: 500,
-          color: '#111',
+          fontFamily: 'var(--font-sans)',
+          color: 'var(--teal-deep)',
           textDecoration: 'none',
-          borderRadius: 10,
+          borderRadius: 'var(--r-pill)',
+          border: '1.5px solid var(--line-teal)',
+          background: 'var(--surface)',
+          transition: `background var(--dur-quick)`,
+          letterSpacing: '0.01em',
         }}
       >
-        <span
-          aria-hidden
-          style={{
-            width: 18,
-            height: 18,
-            borderRadius: '50%',
-            border: '1.5px solid #111',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 14,
-            lineHeight: 1,
-          }}
-        >
-          +
-        </span>
-        New chat
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        New session
       </Link>
 
-      <a
-        href={BRAND.dashboardUrl}
-        style={{
-          display: 'block',
-          padding: '10px 14px',
-          textAlign: 'center',
-          fontSize: 14,
-          color: '#111',
-          textDecoration: 'none',
-          border: '1px solid #e0e0e0',
-          borderRadius: 10,
-          background: '#fff',
-        }}
-      >
-        Back to Dashboard
-      </a>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, overflowY: 'auto', flex: 1 }}>
-        <div
+      {/* Back to dashboard — only shown if configured */}
+      {BRAND.dashboardUrl && (
+        <a
+          href={BRAND.dashboardUrl}
           style={{
-            fontSize: 11,
-            letterSpacing: '0.08em',
-            color: '#999',
-            padding: '8px 12px 4px',
-            textTransform: 'uppercase',
+            display: 'block',
+            padding: '9px 14px',
+            textAlign: 'center',
+            fontSize: 13,
+            color: 'var(--ink-3)',
+            textDecoration: 'none',
+            border: '1px solid var(--line)',
+            borderRadius: 'var(--r-sm)',
+            background: 'var(--surface)',
+            fontFamily: 'var(--font-sans)',
           }}
         >
-          Recent Chats
+          Back to dashboard
+        </a>
+      )}
+
+      {/* Chat list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto', flex: 1 }}>
+        <div style={{
+          fontSize: 11,
+          letterSpacing: '0.22em',
+          color: 'var(--teal-deep)',
+          padding: '6px 10px 6px',
+          textTransform: 'uppercase',
+          fontFamily: 'var(--font-sans)',
+          fontWeight: 500,
+        }}>
+          Recent
         </div>
+
         {chats.length === 0 && (
-          <div style={{ padding: '8px 12px', fontSize: 13, color: '#aaa', fontStyle: 'italic' }}>
-            No chats yet
+          <div style={{ padding: '8px 10px', fontSize: 13, color: 'var(--ink-4)', fontStyle: 'italic', fontFamily: 'var(--font-serif)' }}>
+            Your sanctuary is quiet.
           </div>
         )}
+
         {chats.map((c) => {
           const isActive = c.id === activeId;
           return (
@@ -109,16 +127,18 @@ export function Sidebar({ chats, email }: { chats: ChatListItem[]; email: string
               href={`/chat/${c.id}`}
               title={c.title}
               style={{
-                padding: '8px 12px',
-                fontSize: 14,
-                color: isActive ? '#111' : '#444',
+                padding: '8px 10px',
+                fontSize: 13,
+                fontFamily: 'var(--font-sans)',
+                color: isActive ? 'var(--teal-ink)' : 'var(--ink-2)',
                 textDecoration: 'none',
-                background: isActive ? '#f0eee8' : 'transparent',
-                borderRadius: 8,
+                background: isActive ? 'var(--teal-mist)' : 'transparent',
+                borderRadius: 'var(--r-sm)',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 fontWeight: isActive ? 500 : 400,
+                transition: `background var(--dur-quick)`,
               }}
             >
               {c.title}
@@ -127,41 +147,34 @@ export function Sidebar({ chats, email }: { chats: ChatListItem[]; email: string
         })}
       </div>
 
-      <div
-        style={{
-          borderTop: '1px solid #ececec',
-          paddingTop: 12,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-        }}
-      >
+      {/* Footer */}
+      <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
         {email && (
-          <div
-            style={{
-              padding: '4px 12px',
-              fontSize: 12,
-              color: '#888',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-            title={email}
-          >
+          <div style={{
+            padding: '2px 10px',
+            fontSize: 11,
+            color: 'var(--ink-4)',
+            fontFamily: 'var(--font-sans)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }} title={email}>
             {email}
           </div>
         )}
         <button
           onClick={signOut}
           style={{
-            padding: '8px 12px',
-            fontSize: 13,
-            color: '#666',
+            padding: '8px 10px',
+            fontSize: 12,
+            fontFamily: 'var(--font-sans)',
+            color: 'var(--ink-3)',
             background: 'transparent',
             border: 'none',
             textAlign: 'left',
             cursor: 'pointer',
-            borderRadius: 8,
+            borderRadius: 'var(--r-sm)',
+            letterSpacing: '0.01em',
           }}
         >
           Sign out
