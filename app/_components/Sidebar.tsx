@@ -3,10 +3,20 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ChatListItem } from '@/lib/db';
+import type { Journey } from '@/lib/journey';
 import { createClient } from '@/lib/supabase/client';
 import { BRAND } from '@/lib/brand';
 
-export function Sidebar({ chats, email }: { chats: ChatListItem[]; email: string | null }) {
+const PHASE_COLORS: Record<number, string> = {
+  1: '#9DAD8C', 2: '#4FB1AC', 3: '#ED9E7E',
+  4: '#DDA0A8', 5: '#C6A079', 6: '#c8a25f',
+};
+
+export function Sidebar({ chats, email, journey }: {
+  chats: ChatListItem[];
+  email: string | null;
+  journey?: Journey | null;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const activeId = pathname?.startsWith('/chat/') ? pathname.split('/')[2] : null;
@@ -77,6 +87,59 @@ export function Sidebar({ chats, email }: { chats: ChatListItem[]; email: string
         </svg>
         New session
       </Link>
+
+      {/* Phase tracker */}
+      {journey && (
+        <div style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--line)',
+          borderRadius: 'var(--r-md)',
+          padding: '12px 14px',
+          boxShadow: 'var(--sh-sm)',
+        }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 500, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--teal-deep)', marginBottom: 6 }}>
+            Your journey
+          </div>
+
+          {/* Phase name + number */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{
+              width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+              background: PHASE_COLORS[journey.phase] ?? 'var(--teal)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'var(--font-sans)', fontSize: 11, fontWeight: 700, color: '#fff',
+            }}>
+              {journey.phase}
+            </div>
+            <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 14, color: 'var(--ink)', lineHeight: 1.2 }}>
+              {journey.phaseName}
+            </div>
+          </div>
+
+          {/* Progress dots */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {[1,2,3,4,5,6].map((p) => (
+              <div key={p} style={{
+                flex: 1, height: 4, borderRadius: 2,
+                background: p <= journey.phase
+                  ? (PHASE_COLORS[journey.phase] ?? 'var(--teal)')
+                  : 'var(--line)',
+                transition: 'background 0.3s',
+              }} />
+            ))}
+          </div>
+
+          {/* Homework badge */}
+          {journey.homework && (
+            <div style={{ marginTop: 10, padding: '8px 10px', background: 'var(--blush-mist)', border: '1px solid var(--blush)', borderRadius: 'var(--r-sm)' }}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 500, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--blush-ink)', marginBottom: 3 }}>Practice</div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.4 }}>
+                {journey.homework.length > 80 ? journey.homework.slice(0, 80) + '…' : journey.homework}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Back to dashboard — only shown if configured */}
       {BRAND.dashboardUrl && (

@@ -17,12 +17,37 @@ const ACCEPTED_MIME =
   'image/png,image/jpeg,image/webp,image/gif,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown';
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 
+type AffirmationData = { lines: string[]; theme: string; identityWord: string };
+
 export function Chat({ id, initialMessages }: { id: string; initialMessages: UIMessage[] }) {
   const router = useRouter();
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [affirmation, setAffirmation] = useState<AffirmationData | null>(null);
+  const [affirmationLoading, setAffirmationLoading] = useState(false);
   const { messages, sendMessage, status } = useChat({ id, messages: initialMessages });
+
+  async function buildAffirmation() {
+    if (affirmationLoading) return;
+    setAffirmationLoading(true);
+    try {
+      const simplified = messages.map((m) => ({
+        role: m.role,
+        text: m.parts
+          .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+          .map((p) => p.text).join(' '),
+      }));
+      const res = await fetch('/api/affirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: simplified }),
+      });
+      const data = await res.json();
+      if (data.lines?.length) setAffirmation(data);
+    } catch { /* ignore */ }
+    finally { setAffirmationLoading(false); }
+  }
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const isEmpty = messages.length === 0;
@@ -102,11 +127,85 @@ export function Chat({ id, initialMessages }: { id: string; initialMessages: UIM
               <div ref={bottomRef} />
             </div>
           </div>
+          {/* Affirmation card — shown when generated */}
+          {affirmation && affirmation.lines.length > 0 && (
+            <div style={{ maxWidth: 720, margin: '0 auto 8px', padding: '0 24px' }}>
+              <AffirmationCard data={affirmation} onClose={() => setAffirmation(null)} />
+            </div>
+          )}
+
+          {/* Affirmation button — visible after 6+ messages */}
+          {messages.length >= 6 && !affirmation && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+              <button
+                type="button"
+                onClick={buildAffirmation}
+                disabled={affirmationLoading}
+                style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  letterSpacing: '0.04em',
+                  padding: '7px 16px',
+                  borderRadius: 'var(--r-pill)',
+                  border: '1px solid var(--line-teal)',
+                  background: 'var(--surface)',
+                  color: 'var(--teal-deep)',
+                  cursor: affirmationLoading ? 'wait' : 'pointer',
+                  opacity: affirmationLoading ? 0.6 : 1,
+                  boxShadow: 'var(--sh-sm)',
+                }}
+              >
+                {affirmationLoading ? 'Creating…' : '✦ Create my affirmation'}
+              </button>
+            </div>
+          )}
+
           <FloatingInput input={input} setInput={setInput} send={send} isLoading={isLoading}
             attachments={attachments} addFiles={addFiles} removeAttachment={removeAttachment}
             attachmentError={attachmentError} />
         </>
       )}
+    </div>
+  );
+}
+
+// ── Class recommendation detection ──────────────────────────────────────────
+const CLASS_PATTERNS = [
+  { pattern: /sound.?bath|singing bowl|crystal bowl/i, label: 'Sound Bath', icon: '🎵' },
+  { pattern: /\bbarreFlex\b|barre class|barre session/i, label: 'BarreFlex', icon: '✨' },
+  { pattern: /\bmeditat(e|ion)\b|breathwork session/i, label: 'Meditation', icon: '🌙' },
+  { pattern: /\breiki\b|energy heal/i, label: 'Reiki Session', icon: '🌿' },
+  { pattern: /stretch session|somatic session/i, label: 'Stretch Session', icon: '🌸' },
+];
+
+function detectClass(text: string) {
+  for (const c of CLASS_PATTERNS) {
+    if (c.pattern.test(text)) return c;
+  }
+  return null;
+}
+
+function ClassChip({ label, icon }: { label: string; icon: string }) {
+  return (
+    <div style={{ alignSelf: 'flex-start', marginTop: 2 }}>
+      <a
+        href="https://tropicalrefuge.com/classes"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
+          letterSpacing: '0.02em', color: 'var(--teal-deep)',
+          background: 'var(--teal-mist)', border: '1px solid var(--line-teal)',
+          borderRadius: 'var(--r-pill)', padding: '6px 14px',
+          textDecoration: 'none', boxShadow: 'var(--sh-sm)',
+        }}
+      >
+        <span>{icon}</span>
+        <span>Book a {label}</span>
+        <span style={{ fontSize: 10, opacity: 0.7 }}>→</span>
+      </a>
     </div>
   );
 }
@@ -150,20 +249,26 @@ function MessageBubble({ message: m }: { message: UIMessage }) {
         );
       })}
       {text && (
-        <div style={{
-          padding: '10px 16px',
-          fontSize: 15,
-          fontFamily: 'var(--font-sans)',
-          lineHeight: 1.6,
-          borderRadius: m.role === 'user' ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
-          background: m.role === 'user' ? 'var(--gold)' : 'var(--surface)',
-          color: m.role === 'user' ? '#fff' : 'var(--ink)',
-          border: m.role === 'user' ? 'none' : '1px solid var(--line)',
-          boxShadow: m.role === 'user' ? '0 4px 16px rgba(164,122,61,0.22)' : 'var(--sh-sm)',
-          whiteSpace: 'pre-wrap',
-        }}>
-          {text}
-        </div>
+        <>
+          <div style={{
+            padding: '10px 16px',
+            fontSize: 15,
+            fontFamily: 'var(--font-sans)',
+            lineHeight: 1.6,
+            borderRadius: m.role === 'user' ? '20px 20px 6px 20px' : '20px 20px 20px 6px',
+            background: m.role === 'user' ? 'var(--gold)' : 'var(--surface)',
+            color: m.role === 'user' ? '#fff' : 'var(--ink)',
+            border: m.role === 'user' ? 'none' : '1px solid var(--line)',
+            boxShadow: m.role === 'user' ? '0 4px 16px rgba(164,122,61,0.22)' : 'var(--sh-sm)',
+            whiteSpace: 'pre-wrap',
+          }}>
+            {text}
+          </div>
+          {m.role === 'assistant' && (() => {
+            const cls = detectClass(text);
+            return cls ? <ClassChip label={cls.label} icon={cls.icon} /> : null;
+          })()}
+        </>
       )}
     </div>
   );
@@ -256,7 +361,11 @@ function EmptyHero(props: HeroProps) {
           <button
             key={g.key}
             type="button"
-            onClick={() => props.setInput(g.label)}
+            onClick={() => props.setInput(
+              g.key === 'reset'
+                ? "I'd like to do my Daily Refuge Reset"
+                : g.label
+            )}
             style={{
               fontFamily: 'var(--font-sans)',
               fontWeight: 500,
@@ -264,9 +373,9 @@ function EmptyHero(props: HeroProps) {
               letterSpacing: '0.01em',
               padding: '9px 18px',
               borderRadius: 'var(--r-pill)',
-              border: '1px solid var(--line)',
-              background: 'var(--surface)',
-              color: 'var(--ink-2)',
+              border: g.special ? '1px solid var(--line-teal)' : '1px solid var(--line)',
+              background: g.special ? 'var(--teal-mist)' : 'var(--surface)',
+              color: g.special ? 'var(--teal-deep)' : 'var(--ink-2)',
               cursor: 'pointer',
               boxShadow: 'var(--sh-sm)',
               transition: `background var(--dur-quick) var(--ease-calm), color var(--dur-quick) var(--ease-calm), border-color var(--dur-quick) var(--ease-calm)`,
@@ -278,9 +387,9 @@ function EmptyHero(props: HeroProps) {
               (e.currentTarget as HTMLButtonElement).style.color = 'var(--teal-deep)';
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--line)';
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--ink-2)';
+              (e.currentTarget as HTMLButtonElement).style.background = g.special ? 'var(--teal-mist)' : 'var(--surface)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = g.special ? 'var(--line-teal)' : 'var(--line)';
+              (e.currentTarget as HTMLButtonElement).style.color = g.special ? 'var(--teal-deep)' : 'var(--ink-2)';
             }}
           >
             {g.label}
@@ -292,6 +401,7 @@ function EmptyHero(props: HeroProps) {
 }
 
 const GOALS = [
+  { key: 'reset',        label: '🌅 Morning Reset', special: true },
   { key: 'myself',       label: 'Improve myself' },
   { key: 'relationship', label: 'Improve my relationship' },
   { key: 'new-love',     label: 'Attract a new relationship' },
@@ -497,6 +607,98 @@ function ArrowUpIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M12 19V5" /><path d="m5 12 7-7 7 7" />
     </svg>
+  );
+}
+
+function AffirmationCard({ data, onClose }: { data: AffirmationData; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  function copy() {
+    const text = data.lines.join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, var(--teal-mist), var(--blush-mist))',
+      border: '1px solid var(--line-teal)',
+      borderRadius: 'var(--r-lg)',
+      padding: '20px 24px',
+      position: 'relative',
+      boxShadow: 'var(--sh-blush)',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 10, fontWeight: 500, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--teal-deep)' }}>
+            Your affirmation
+          </div>
+          {data.theme && (
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+              {data.theme}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-4)', fontSize: 18, lineHeight: 1, padding: 4 }}
+          aria-label="Close"
+        >×</button>
+      </div>
+
+      {/* Affirmation lines */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+        {data.lines.map((line, i) => (
+          <div key={i} style={{
+            fontFamily: 'var(--font-serif)',
+            fontStyle: 'italic',
+            fontSize: 'clamp(15px, 2.5vw, 18px)',
+            color: 'var(--ink)',
+            lineHeight: 1.4,
+          }}>
+            {line}
+          </div>
+        ))}
+      </div>
+
+      {/* Identity word + copy */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {data.identityWord && (
+          <div style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: 11,
+            fontWeight: 500,
+            letterSpacing: '0.15em',
+            textTransform: 'uppercase',
+            color: 'var(--surface)',
+            background: 'var(--teal-deep)',
+            padding: '5px 14px',
+            borderRadius: 'var(--r-pill)',
+          }}>
+            I am {data.identityWord}
+          </div>
+        )}
+        <button
+          onClick={copy}
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: 12,
+            fontWeight: 500,
+            color: 'var(--teal-deep)',
+            background: 'none',
+            border: '1px solid var(--line-teal)',
+            borderRadius: 'var(--r-pill)',
+            padding: '5px 14px',
+            cursor: 'pointer',
+          }}
+        >
+          {copied ? '✓ Copied' : 'Copy'}
+        </button>
+      </div>
+    </div>
   );
 }
 

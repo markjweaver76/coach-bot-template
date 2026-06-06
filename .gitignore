@@ -17,3 +17,4 @@ public/*.jpg
 public/*.jpeg
 public/*.svg
 !public/.gitkeep
+training/
