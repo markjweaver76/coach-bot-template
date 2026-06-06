@@ -12,10 +12,11 @@ const PHASE_COLORS: Record<number, string> = {
   4: '#DDA0A8', 5: '#C6A079', 6: '#c8a25f',
 };
 
-export function Sidebar({ chats, email, journey }: {
+export function Sidebar({ chats, email, journey, isAdmin }: {
   chats: ChatListItem[];
   email: string | null;
   journey?: Journey | null;
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -139,6 +140,27 @@ export function Sidebar({ chats, email, journey }: {
             </div>
           )}
         </div>
+      )}
+
+      {/* Coach dashboard — admin only */}
+      {isAdmin && (
+        <Link
+          href="/dashboard"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '9px 14px', fontSize: 12,
+            color: 'var(--teal-deep)', textDecoration: 'none',
+            border: '1px solid var(--line-teal)', borderRadius: 'var(--r-sm)',
+            background: 'var(--teal-mist)', fontFamily: 'var(--font-sans)',
+            fontWeight: 500, letterSpacing: '0.02em',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          Community dashboard
+        </Link>
       )}
 
       {/* Back to dashboard — only shown if configured */}

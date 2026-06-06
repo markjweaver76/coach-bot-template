@@ -17,9 +17,11 @@ export default async function ChatLayout({ children }: { children: ReactNode }) 
     getJourney(user.id),
     getIntake(user.id),
   ]);
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const isAdmin = adminEmail ? user.email === adminEmail : false;
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--cream, #FAF3E8)' }}>
-      <Sidebar chats={chats} email={user.email ?? null} journey={journey} />
+      <Sidebar chats={chats} email={user.email ?? null} journey={journey} isAdmin={isAdmin} />
       <div style={{ flex: 1, minWidth: 0, overflowX: 'hidden' }}>
         <IntakeWrapper hasIntake={!!intake}>
           {children}
