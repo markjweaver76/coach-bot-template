@@ -11,6 +11,7 @@ import { buildSystemPrompt } from '@/lib/system-prompt';
 import { extractAndStoreFacts } from '@/lib/memory';
 import { sendSessionSummary } from '@/lib/session-summary';
 import { getJourney, detectAndUpdatePhase, detectAndSetHomework } from '@/lib/journey';
+import { getIntake } from '@/lib/intake';
 import { inlineNonImageAttachments } from '@/lib/extract-text';
 import { getUser } from '@/lib/supabase/server';
 import { BRAND } from '@/lib/brand';
@@ -36,9 +37,10 @@ export async function POST(req: Request) {
   // Embed once, use for both RAG retrieval and user-memory retrieval.
   let docHits: Array<{ source: string; content: string; similarity: number }> = [];
   let memoryHits: Array<{ fact: string; similarity: number; createdAt: string }> = [];
-  const [queryEmbeddingResult, journey] = await Promise.all([
+  const [queryEmbeddingResult, journey, intake] = await Promise.all([
     lastUserText.trim() ? embedOne(lastUserText) : Promise.resolve(null),
     getJourney(user.id),
+    getIntake(user.id),
   ]);
   if (queryEmbeddingResult) {
     [docHits, memoryHits] = await Promise.all([
@@ -51,6 +53,7 @@ export async function POST(req: Request) {
     contextChunks: docHits,
     userFacts: memoryHits,
     journey,
+    intake,
   });
 
   // Extract text from PDF/DOCX/TXT attachments at request time so the model sees their content.

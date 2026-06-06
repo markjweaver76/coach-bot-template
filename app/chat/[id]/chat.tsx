@@ -190,7 +190,7 @@ function ClassChip({ label, icon }: { label: string; icon: string }) {
   return (
     <div style={{ alignSelf: 'flex-start', marginTop: 2 }}>
       <a
-        href="https://tropicalrefuge.com/classes"
+        href="https://www.vagaro.com/tropicalrefuge1"
         target="_blank"
         rel="noopener noreferrer"
         style={{

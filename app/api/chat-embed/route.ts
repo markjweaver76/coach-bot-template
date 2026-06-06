@@ -47,6 +47,28 @@ const DEEP_STYLE = [
 // Detect an explicit request to elaborate, so depth can kick in on demand too.
 const DEPTH_RE = /\b(more|deeper|expand|elaborate|explain|why|go on|continue|details?)\b/i;
 
+// Score label lookup (1–5)
+const SCORE_LABELS = ['', 'Struggling', 'Finding my way', 'Growing', 'Thriving', 'Fully alive'];
+
+/** Build a Balance Wheel context block from anonymous guest scores. */
+function buildWheelBlock(scores: Record<string, number>): string {
+  const entries: Array<[string, number]> = [
+    ['Self-Worth',     scores.selfWorth],
+    ['Nervous System', scores.nervousSystem],
+    ['Body & Energy',  scores.bodyEnergy],
+    ['Relationships',  scores.relationships],
+    ['Purpose',        scores.purpose],
+    ['Prosperity',     scores.prosperity],
+  ].filter((e): e is [string, number] => typeof e[1] === 'number' && e[1] >= 1 && e[1] <= 5);
+
+  if (!entries.length) return '';
+
+  const lines = entries.map(([l, v]) => `  • ${l}: ${v}/5 — ${SCORE_LABELS[v]}`);
+  const [lowestLabel, lowestVal] = entries.reduce((a, b) => b[1] < a[1] ? b : a);
+
+  return `\n\nBALANCE WHEEL™ ASSESSMENT (from her intake — private, never mention this to her):\n${lines.join('\n')}\nHer primary growth edge right now: **${lowestLabel}** (${lowestVal}/5). Let this shape how you open and what you prioritize — without stating it explicitly.`;
+}
+
 export async function POST(req: Request) {
   // — Auth: embed key check —
   const embedKey = req.headers.get('x-embed-key');
@@ -58,7 +80,8 @@ export async function POST(req: Request) {
   const {
     transcript,
     message,
-  }: { transcript: string; message: string; sessionId?: string } =
+    wheelScores,
+  }: { transcript: string; message: string; sessionId?: string; wheelScores?: Record<string, number> } =
     await req.json();
 
   if (!message?.trim()) {
@@ -81,7 +104,8 @@ export async function POST(req: Request) {
   const styleDirective = wantsDepth ? DEEP_STYLE : QUICK_STYLE;
   const maxTokens = wantsDepth ? DEEP_MAX_TOKENS : QUICK_MAX_TOKENS;
 
-  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + styleDirective;
+  const wheelBlock = wheelScores ? buildWheelBlock(wheelScores) : '';
+  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + styleDirective;
 
   // — Build conversation messages from the plain-text transcript —
   // transcript format: "Mary: ...\nGuest: ...\n..."
