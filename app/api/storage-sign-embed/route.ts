@@ -1,39 +1,25 @@
 /**
- * /api/storage-sign-embed — mint a one-time signed upload URL for Studio media.
+ * /api/storage-sign-embed — mint a presigned upload URL for Studio media (Cloudflare R2).
  *
- * The Manifest with Mary Studio uploads video/audio straight to Supabase Storage
- * (so large files never route through the small app server / its 1 GB disk). This
- * endpoint uses the service role to (a) ensure the public `takes` bucket exists and
- * (b) return a signed upload URL the browser PUTs the file to directly.
+ * The Manifest with Mary Studio uploads video/audio straight to R2 (S3-compatible),
+ * so large files never route through the small app server / its 1 GB disk. We sign a
+ * one-time PUT URL with the R2 credentials (SigV4 via aws4fetch); the browser PUTs the
+ * file directly, then the public bucket URL serves it (free egress on R2).
  *
- * Embed-key gated (same pattern as the other -embed routes). Service role stays here.
+ * Embed-key gated (same pattern as the other -embed routes). R2 secrets stay here.
+ *
+ * Required env: R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET,
+ *               R2_PUBLIC_BASE (e.g. https://pub-xxxx.r2.dev — no trailing slash).
  */
 import { NextResponse, type NextRequest } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { AwsClient } from 'aws4fetch';
 
 export const dynamic = 'force-dynamic';
 
-const BUCKET = 'takes';
-
-function admin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-}
-
-let bucketEnsured = false;
-async function ensureBucket(supabase: ReturnType<typeof admin>) {
-  if (bucketEnsured) return;
-  // Idempotent: create the public bucket; ignore "already exists".
-  // No per-bucket fileSizeLimit — the project's global Storage upload limit governs,
-  // so raising that limit (Supabase → Storage → Settings) lifts uploads here too.
-  const { error } = await supabase.storage.createBucket(BUCKET, { public: true });
-  if (error && !/exist|already/i.test(error.message)) {
-    throw new Error(`bucket: ${error.message}`);
-  }
-  bucketEnsured = true;
+function env(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing ${name}`);
+  return v;
 }
 
 export async function POST(req: NextRequest) {
@@ -49,31 +35,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  // Sanitize the path (id.ext) — defend against traversal / odd chars.
+  // Sanitize the object key (id.ext) — defend against traversal / odd chars.
   const path = String(body.path ?? '').replace(/[^a-zA-Z0-9._-]/g, '');
   if (!path || path.includes('..')) {
     return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
   }
 
   try {
-    const supabase = admin();
-    await ensureBucket(supabase);
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUploadUrl(path, { upsert: true });
-    if (error || !data) {
-      return NextResponse.json({ error: error?.message ?? 'sign failed' }, { status: 500 });
-    }
-    const base = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const accountId = env('R2_ACCOUNT_ID');
+    const bucket = env('R2_BUCKET');
+    const publicBase = env('R2_PUBLIC_BASE').replace(/\/+$/, '');
+
+    const r2 = new AwsClient({
+      accessKeyId: env('R2_ACCESS_KEY_ID'),
+      secretAccessKey: env('R2_SECRET_ACCESS_KEY'),
+      region: 'auto',
+      service: 's3',
+    });
+
+    // Presign a PUT to the object (query-auth so the browser needs no signing).
+    const target = new URL(`https://${accountId}.r2.cloudflarestorage.com/${bucket}/${path}`);
+    target.searchParams.set('X-Amz-Expires', '3600'); // 1-hour window to start the upload
+    const signed = await r2.sign(target.toString(), {
+      method: 'PUT',
+      aws: { signQuery: true },
+    });
+
     return NextResponse.json({
-      uploadUrl: data.signedUrl,                 // browser PUTs the file here
-      token: data.token,
-      path: data.path,
-      publicUrl: `${base}/storage/v1/object/public/${BUCKET}/${path}`,
+      uploadUrl: signed.url,            // browser PUTs the raw file here
+      publicUrl: `${publicBase}/${path}`,
+      path,
     });
   } catch (err) {
     console.error('[storage-sign-embed] error', err);
     const msg = err instanceof Error ? err.message : 'Unknown error';
+    // Surface missing-config clearly so setup problems are obvious.
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
