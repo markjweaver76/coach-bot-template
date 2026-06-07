@@ -14,10 +14,27 @@
 import { streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { embedOne } from '@/lib/embed';
-import { searchDocs } from '@/lib/db';
+import { createClient } from '@supabase/supabase-js';
+import { searchDocs, persistAppTurn } from '@/lib/db';
 import { buildSystemPrompt } from '@/lib/system-prompt';
 
 export const maxDuration = 60;
+
+/** Resolve a Supabase user id from a forwarded access token (or null). */
+async function userIdFromToken(accessToken?: string): Promise<string | null> {
+  if (!accessToken) return null;
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+    const { data: { user } } = await supabase.auth.getUser(accessToken);
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
 
 // Faster, capped model for the embedded mobile chat (overridable via env).
 // Keeps the main web chat (BRAND.chatModel) untouched.
@@ -81,12 +98,17 @@ export async function POST(req: Request) {
     transcript,
     message,
     wheelScores,
-  }: { transcript: string; message: string; sessionId?: string; wheelScores?: Record<string, number> } =
+    accessToken,
+  }: { transcript: string; message: string; sessionId?: string; wheelScores?: Record<string, number>; accessToken?: string } =
     await req.json();
 
   if (!message?.trim()) {
     return Response.json({ reply: '' });
   }
+
+  // If a signed-in user's token came through, resolve their id (in parallel with
+  // RAG) so we can persist this turn to their account when the reply completes.
+  const userIdPromise = userIdFromToken(accessToken);
 
   // — RAG: embed the user message and retrieve relevant training docs —
   let docHits: Array<{ source: string; content: string; similarity: number }> = [];
@@ -134,6 +156,16 @@ export async function POST(req: Request) {
     system,
     messages: historyMessages,
     maxOutputTokens: maxTokens,
+    onFinish: async ({ text }) => {
+      try {
+        const userId = await userIdPromise;
+        if (userId && text?.trim()) {
+          await persistAppTurn(userId, message, text);
+        }
+      } catch (err) {
+        console.error('[chat-embed] persist failed', err);
+      }
+    },
   });
 
   return result.toTextStreamResponse();

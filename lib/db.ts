@@ -119,6 +119,39 @@ export async function saveChat({
   }
 }
 
+// Title for the single rolling chat that backs the embedded Manifest with Mary
+// app companion. One chat per user keeps the dashboard's activity counts clean.
+const APP_CHAT_TITLE = 'Mary companion (app)';
+
+/**
+ * Persist one embedded-app conversation turn (user message + Mary's reply) to the
+ * user's account, so it appears in the community dashboard's activity counts.
+ * Finds the user's rolling app chat or creates it. Best-effort — callers swallow errors.
+ */
+export async function persistAppTurn(
+  userId: string,
+  userText: string,
+  assistantText: string,
+): Promise<void> {
+  const sql = db();
+  const existing = await sql<Array<{ id: string }>>`
+    SELECT id FROM chats
+    WHERE user_id = ${userId} AND title = ${APP_CHAT_TITLE}
+    ORDER BY created_at ASC LIMIT 1
+  `;
+  let chatId = existing[0]?.id;
+  if (!chatId) {
+    chatId = randomUUID();
+    await sql`INSERT INTO chats (id, user_id, title) VALUES (${chatId}, ${userId}, ${APP_CHAT_TITLE})`;
+  }
+  const insert = (role: 'user' | 'assistant', text: string) => sql`
+    INSERT INTO messages (id, chat_id, role, parts)
+    VALUES (${randomUUID()}, ${chatId}, ${role}, ${sql.json([{ type: 'text', text }] as never)})
+  `;
+  if (userText.trim()) await insert('user', userText.trim());
+  if (assistantText.trim()) await insert('assistant', assistantText.trim());
+}
+
 export async function searchDocs(
   queryEmbedding: number[],
   k = 6,
