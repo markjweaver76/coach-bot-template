@@ -27,11 +27,10 @@ let bucketEnsured = false;
 async function ensureBucket(supabase: ReturnType<typeof admin>) {
   if (bucketEnsured) return;
   // Idempotent: create the public bucket; ignore "already exists".
-  const { error } = await supabase.storage.createBucket(BUCKET, {
-    public: true,
-    fileSizeLimit: '5368709120', // 5 GB ceiling (project-level limit may be lower)
-  });
-  if (error && !/exist/i.test(error.message)) {
+  // No per-bucket fileSizeLimit — the project's global Storage upload limit governs,
+  // so raising that limit (Supabase → Storage → Settings) lifts uploads here too.
+  const { error } = await supabase.storage.createBucket(BUCKET, { public: true });
+  if (error && !/exist|already/i.test(error.message)) {
     throw new Error(`bucket: ${error.message}`);
   }
   bucketEnsured = true;
