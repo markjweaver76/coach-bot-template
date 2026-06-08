@@ -162,7 +162,7 @@ export async function sendSessionSummary({
   try {
     const resend = new Resend(apiKey);
     await resend.emails.send({
-      from: 'Coach Mary <mary@manifestwithmary.com>',
+      from: 'Coach Mary <mary@marytomanifest.com>',
       to: userEmail,
       subject: `Your session with Coach Mary — ${sessionDate}`,
       html,

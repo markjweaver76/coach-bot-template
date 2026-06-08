@@ -115,7 +115,7 @@ export async function POST(req: Request) {
   try {
     const resend = new Resend(apiKey);
     await resend.emails.send({
-      from: 'Coach Mary <mary@manifestwithmary.com>',
+      from: 'Coach Mary <mary@marytomanifest.com>',
       to: email,
       subject: `Your session with Coach Mary — ${sessionDate}`,
       html: buildEmailHtml({ ...summary, sessionDate }),
