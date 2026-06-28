@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { accessToken?: string; scores?: Partial<WheelScores> };
+  let body: { accessToken?: string; scores?: Partial<WheelScores>; source?: 'intake' | 'checkin' };
   try {
     body = await req.json();
   } catch {
@@ -62,7 +62,10 @@ export async function POST(req: NextRequest) {
   try {
     await saveIntake(user.id, scores);
     const phase = scoresToPhase(scores);
-    await upsertPhase(user.id, phase, 'Starting phase set from Balance Wheel™ intake assessment');
+    const why = body.source === 'checkin'
+      ? 'Phase updated from your latest check-in'
+      : 'Starting phase set from Balance Wheel™ intake assessment';
+    await upsertPhase(user.id, phase, why);
     return NextResponse.json({ ok: true, phase });
   } catch (err) {
     console.error('[intake-embed] error', err);

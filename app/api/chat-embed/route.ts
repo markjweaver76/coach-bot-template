@@ -16,6 +16,7 @@ import { openai } from '@ai-sdk/openai';
 import { embedOne } from '@/lib/embed';
 import { createClient } from '@supabase/supabase-js';
 import { searchDocs, persistAppTurn } from '@/lib/db';
+import { getIntake, type WheelScores } from '@/lib/intake';
 import { buildSystemPrompt } from '@/lib/system-prompt';
 
 export const maxDuration = 60;
@@ -173,9 +174,31 @@ export async function POST(req: Request) {
     return Response.json({ reply: '' });
   }
 
-  // If a signed-in user's token came through, resolve their id (in parallel with
-  // RAG) so we can persist this turn to their account when the reply completes.
-  const userIdPromise = userIdFromToken(accessToken);
+  // If a signed-in user's token came through, resolve their id AND their live
+  // Balance Wheel scores (in parallel with RAG). Reading the wheel server-side
+  // means Mary reasons from their CURRENT state — updated by check-ins (and, later,
+  // inferred from chat) — rather than the frozen value the client passes.
+  const userCtxPromise: Promise<{ userId: string | null; scores: WheelScores | null }> =
+    (async () => {
+      const userId = await userIdFromToken(accessToken);
+      if (!userId) return { userId: null, scores: null };
+      try {
+        const intake = await getIntake(userId);
+        return {
+          userId,
+          scores: intake ? {
+            selfWorth: intake.selfWorth,
+            nervousSystem: intake.nervousSystem,
+            bodyEnergy: intake.bodyEnergy,
+            relationships: intake.relationships,
+            purpose: intake.purpose,
+            prosperity: intake.prosperity,
+          } : null,
+        };
+      } catch {
+        return { userId, scores: null };
+      }
+    })();
 
   // — RAG: embed the user message and retrieve relevant training docs —
   let docHits: Array<{ source: string; content: string; similarity: number }> = [];
@@ -193,7 +216,10 @@ export async function POST(req: Request) {
   const styleDirective = wantsDepth ? DEEP_STYLE : QUICK_STYLE;
   const maxTokens = wantsDepth ? DEEP_MAX_TOKENS : QUICK_MAX_TOKENS;
 
-  const wheelBlock = wheelScores ? buildWheelBlock(wheelScores) : '';
+  // Live server scores (signed-in) take precedence over the client-passed wheel.
+  const { userId, scores: liveScores } = await userCtxPromise;
+  const effectiveWheel = liveScores ?? wheelScores;
+  const wheelBlock = effectiveWheel ? buildWheelBlock(effectiveWheel) : '';
   const appBlock = appContext ? buildAppContextBlock(appContext) : '';
   const pronounBlock = pronouns ? buildPronounBlock(pronouns) : '';
 
@@ -228,7 +254,6 @@ export async function POST(req: Request) {
     maxOutputTokens: maxTokens,
     onFinish: async ({ text }) => {
       try {
-        const userId = await userIdPromise;
         if (userId && text?.trim()) {
           await persistAppTurn(userId, message, text);
         }
