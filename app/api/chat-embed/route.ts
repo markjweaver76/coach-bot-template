@@ -83,7 +83,7 @@ function buildWheelBlock(scores: Record<string, number>): string {
   const lines = entries.map(([l, v]) => `  • ${l}: ${v}/5 — ${SCORE_LABELS[v]}`);
   const [lowestLabel, lowestVal] = entries.reduce((a, b) => b[1] < a[1] ? b : a);
 
-  return `\n\nBALANCE WHEEL™ ASSESSMENT (from her intake — private, never mention this to her):\n${lines.join('\n')}\nHer primary growth edge right now: **${lowestLabel}** (${lowestVal}/5). Let this shape how you open and what you prioritize — without stating it explicitly.`;
+  return `\n\nBALANCE WHEEL™ ASSESSMENT (from the user's intake — private, do not mention this to them):\n${lines.join('\n')}\nTheir primary growth edge right now: **${lowestLabel}** (${lowestVal}/5). Let this shape how you open and what you prioritize — without stating it explicitly.`;
 }
 
 type AppContext = {
@@ -93,6 +93,17 @@ type AppContext = {
   features?: Array<{ name: string; label: string; desc: string }>;
   rituals?: Array<{ key: string; label: string; blurb?: string; len?: number }>;
 };
+
+const PRONOUN_DIRECTIVES: Record<string, string> = {
+  'she/her':   'Refer to the user with she/her pronouns.',
+  'he/him':    'Refer to the user with he/him pronouns.',
+  'they/them': 'Refer to the user with they/them pronouns — avoid gendered terms.',
+};
+
+function buildPronounBlock(pronouns: string): string {
+  const directive = PRONOUN_DIRECTIVES[pronouns];
+  return directive ? `\n\nPRONOUN PREFERENCE: ${directive}` : '';
+}
 
 function buildAppContextBlock(ctx: AppContext): string {
   const lines: string[] = ['\n\nAPP FEATURES MARY CAN RECOMMEND'];
@@ -117,7 +128,7 @@ function buildAppContextBlock(ctx: AppContext): string {
     ctx.features.forEach(f => lines.push(`${f.name} | ${f.label} | ${f.desc}`));
   }
   if (ctx.rituals?.length) {
-    lines.push('\nSHORT RITUALS (a brief guided session to do together — suggest one when she names a feeling or moment it would soothe, e.g. anxiety, exhaustion, before a hard conversation):');
+    lines.push('\nSHORT RITUALS (a brief guided session to do together — suggest one when the user names a feeling or moment it would soothe, e.g. anxiety, exhaustion, before a hard conversation):');
     ctx.rituals.forEach(r => lines.push(`${r.key} | ${r.label}${r.len ? ' | ' + r.len + ' min' : ''}${r.blurb ? ' | ' + r.blurb : ''}`));
   }
   lines.push('\nAction tag format — pick exactly one when relevant:');
@@ -145,6 +156,7 @@ export async function POST(req: Request) {
     wheelScores,
     accessToken,
     appContext,
+    pronouns,
   }: {
     transcript: string;
     message: string;
@@ -152,6 +164,7 @@ export async function POST(req: Request) {
     wheelScores?: Record<string, number>;
     accessToken?: string;
     appContext?: AppContext;
+    pronouns?: string;
   } = await req.json();
 
   if (!message?.trim()) {
@@ -179,10 +192,10 @@ export async function POST(req: Request) {
   const maxTokens = wantsDepth ? DEEP_MAX_TOKENS : QUICK_MAX_TOKENS;
 
   const wheelBlock = wheelScores ? buildWheelBlock(wheelScores) : '';
-
   const appBlock = appContext ? buildAppContextBlock(appContext) : '';
+  const pronounBlock = pronouns ? buildPronounBlock(pronouns) : '';
 
-  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + appBlock + styleDirective;
+  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + appBlock + pronounBlock + styleDirective;
 
   // — Build conversation messages from the plain-text transcript —
   // transcript format: "Mary: ...\nGuest: ...\n..."
