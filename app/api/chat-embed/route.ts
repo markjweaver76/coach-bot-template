@@ -107,7 +107,8 @@ function buildPronounBlock(pronouns: string): string {
 
 function buildAppContextBlock(ctx: AppContext): string {
   const lines: string[] = ['\n\nAPP FEATURES MARY CAN RECOMMEND'];
-  lines.push('Add at most ONE action tag on its own line at the very end of your response. Only when it genuinely fits — never force it.');
+  lines.push('These turn a suggestion into a tappable card in her app. A tag is the ONLY way she can act on what you offer — described text alone shows no button.');
+  lines.push('RULE: if your reply invites her to do one specific thing listed below (begin a ritual, play a clip, open a journal, view a document, go to a feature), you MUST end with exactly one matching tag on its own final line — after any closing question or invitation. If you are only listening, reflecting, or breathing with her, add no tag. Never add more than one, and only use an id/key from the lists below.');
 
   if (ctx.clips?.length) {
     lines.push('\nLIBRARY CLIPS (video/audio):');
@@ -139,6 +140,7 @@ function buildAppContextBlock(ctx: AppContext): string {
   if (ctx.rituals?.length) {
     lines.push('[RITUAL:ritual_key]    — begin a short ritual together (use the key from the list above)');
   }
+  lines.push('\nReminder: when you offer one of these, the tag is REQUIRED on its own final line — without it she has nothing to tap.');
   return lines.join('\n');
 }
 
