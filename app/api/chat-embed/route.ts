@@ -99,8 +99,15 @@ export async function POST(req: Request) {
     message,
     wheelScores,
     accessToken,
-  }: { transcript: string; message: string; sessionId?: string; wheelScores?: Record<string, number>; accessToken?: string } =
-    await req.json();
+    clipCatalog,
+  }: {
+    transcript: string;
+    message: string;
+    sessionId?: string;
+    wheelScores?: Record<string, number>;
+    accessToken?: string;
+    clipCatalog?: Array<{ id: string; title: string; cat: string; len: number; description?: string }>;
+  } = await req.json();
 
   if (!message?.trim()) {
     return Response.json({ reply: '' });
@@ -127,7 +134,14 @@ export async function POST(req: Request) {
   const maxTokens = wantsDepth ? DEEP_MAX_TOKENS : QUICK_MAX_TOKENS;
 
   const wheelBlock = wheelScores ? buildWheelBlock(wheelScores) : '';
-  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + styleDirective;
+
+  const clipBlock = clipCatalog?.length
+    ? '\n\nLIBRARY CLIPS YOU CAN RECOMMEND (from Mary\'s actual video library):\n' +
+      clipCatalog.map(c => `${c.id} | ${c.title} | ${c.cat} | ${c.len} min${c.description ? ' | ' + c.description : ''}`).join('\n') +
+      '\n\nIf one of these clips would genuinely serve this person right now, add this on its own line at the very end of your response (after all sentences):\n[CLIP:clip_id]\nUse the exact ID. One clip only. Only when it naturally fits — if nothing fits, leave it out entirely.'
+    : '';
+
+  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + clipBlock + styleDirective;
 
   // — Build conversation messages from the plain-text transcript —
   // transcript format: "Mary: ...\nGuest: ...\n..."
