@@ -43,27 +43,31 @@ const EMBED_MODEL = process.env.EMBED_CHAT_MODEL || 'gpt-5.4-mini';
 
 // Response depth scales with the conversation: a quick first reply, then room to
 // go deeper on later turns (or when the guest asks for more).
-const QUICK_MAX_TOKENS = 220;
+const QUICK_MAX_TOKENS = 320;
 const DEEP_MAX_TOKENS = 1000;
 
 const QUICK_STYLE = [
   '\n\nRESPONSE STYLE (important for this channel):',
-  'This is the opening reply — keep it to 1–3 short sentences. Warm, calm, unhurried:',
-  'one gentle idea, then a soft question. No lists, no headings, no markdown.',
-  'Brevity matters here; the conversation can deepen later.',
+  'This is the opening reply.',
+  'If she sent a simple greeting or a short check-in (a sentence or two, no real question), keep it warm and brief — 2–3 sentences, one gentle idea, one soft question.',
+  'If she has asked a real coaching question — about energy, confidence, fear, purpose, healing, blocks, money, relationships, manifestation, or anything substantive — engage with real depth RIGHT NOW: name what you hear beneath the question (the longing or fear underneath the words), then ask ONE specific, powerful question to help her locate it in her body or her life. Do not defer depth to a later turn.',
+  'Either way: no lists, no headings — flowing natural prose only.',
 ].join(' ');
 
 const DEEP_STYLE = [
   '\n\nRESPONSE STYLE (important for this channel):',
-  'The opening exchange has happened — you may now go deeper WHEN it genuinely helps.',
-  'Use your judgment on length: match the depth to what this moment actually needs — sometimes a few sentences, sometimes a fuller response. Never pad to fill space.',
-  'When the reply is substantial, format it for easy reading on a phone:',
-  'short paragraphs, a **bold** lead-in on the few key ideas or transitions, and a short bulleted list (lines starting with "- ") when you offer steps, options, or a small practice.',
-  'Formatting should aid clarity, never clutter — stay warm and calm. Close with one gentle question or invitation.',
+  'This is a continuing conversation — go as deep as the moment genuinely calls for.',
+  'Match length to need: sometimes a few warm sentences, sometimes a fuller response. Never pad.',
+  'When the reply is substantial, format for easy reading on a phone:',
+  'short paragraphs, a **bold** lead-in on key ideas, and a short bulleted list (lines starting with "- ") only when offering steps, options, or a practice.',
+  'Stay warm and grounded. Close with one gentle question or invitation — unless she clearly just needs to be held, not redirected.',
 ].join(' ');
 
 // Detect an explicit request to elaborate, so depth can kick in on demand too.
 const DEPTH_RE = /\b(more|deeper|expand|elaborate|explain|why|go on|continue|details?)\b/i;
+
+// Detect substantive coaching questions — these get real depth even on the first turn.
+const RICH_QUESTION_RE = /\b(how\s+(?:can|do|should|would)|why\s+(?:can'?t|don'?t|do|am)|what\s+(?:is|does|can|should)|divine|quantum|energy|manifest|attract|confiden|fear|stuck|limit|block|heal|worthi|abus|abundan|purpose|calling|trigger|pattern|belief|nervous|anxi|depress|grief|trauma|boundary|boundaries|people.plear|burnout|exhaust|align|soul|spirit)\b/i;
 
 // Score label lookup (1–5)
 const SCORE_LABELS = ['', 'Struggling', 'Finding my way', 'Growing', 'Thriving', 'Fully alive'];
@@ -212,7 +216,8 @@ export async function POST(req: Request) {
   // Turn-aware depth: first reply is quick; subsequent turns (or an explicit
   // "tell me more") may expand.
   const priorGuestTurns = (transcript.match(/^Guest:/gm) || []).length;
-  const wantsDepth = priorGuestTurns >= 1 || DEPTH_RE.test(message);
+  const isRichQuestion = RICH_QUESTION_RE.test(message);
+  const wantsDepth = priorGuestTurns >= 1 || DEPTH_RE.test(message) || isRichQuestion;
   const styleDirective = wantsDepth ? DEEP_STYLE : QUICK_STYLE;
   const maxTokens = wantsDepth ? DEEP_MAX_TOKENS : QUICK_MAX_TOKENS;
 
