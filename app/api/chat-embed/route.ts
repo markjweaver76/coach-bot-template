@@ -91,6 +91,7 @@ type AppContext = {
   journalTemplates?: Array<{ id: string; title: string; promptCount: number }>;
   resources?: Array<{ id: string; title: string; type: string }>;
   features?: Array<{ name: string; label: string; desc: string }>;
+  rituals?: Array<{ key: string; label: string; blurb?: string; len?: number }>;
 };
 
 function buildAppContextBlock(ctx: AppContext): string {
@@ -115,11 +116,18 @@ function buildAppContextBlock(ctx: AppContext): string {
     lines.push('\nAPP FEATURES:');
     ctx.features.forEach(f => lines.push(`${f.name} | ${f.label} | ${f.desc}`));
   }
+  if (ctx.rituals?.length) {
+    lines.push('\nSHORT RITUALS (a brief guided session to do together — suggest one when she names a feeling or moment it would soothe, e.g. anxiety, exhaustion, before a hard conversation):');
+    ctx.rituals.forEach(r => lines.push(`${r.key} | ${r.label}${r.len ? ' | ' + r.len + ' min' : ''}${r.blurb ? ' | ' + r.blurb : ''}`));
+  }
   lines.push('\nAction tag format — pick exactly one when relevant:');
   lines.push('[CLIP:clip_id]         — play a video or audio class');
   lines.push('[JOURNAL:template_id]  — open a journal with this template');
   lines.push('[RESOURCE:resource_id] — view a document shared by Mary');
   lines.push('[FEATURE:feature_name] — navigate to an app feature (bloom-checkin | daily-reset | library)');
+  if (ctx.rituals?.length) {
+    lines.push('[RITUAL:ritual_key]    — begin a short ritual together (use the key from the list above)');
+  }
   return lines.join('\n');
 }
 
@@ -143,12 +151,7 @@ export async function POST(req: Request) {
     sessionId?: string;
     wheelScores?: Record<string, number>;
     accessToken?: string;
-    appContext?: {
-      clips?: Array<{ id: string; title: string; cat: string; len: number; description?: string }>;
-      journalTemplates?: Array<{ id: string; title: string; promptCount: number }>;
-      resources?: Array<{ id: string; title: string; type: string }>;
-      features?: Array<{ name: string; label: string; desc: string }>;
-    };
+    appContext?: AppContext;
   } = await req.json();
 
   if (!message?.trim()) {

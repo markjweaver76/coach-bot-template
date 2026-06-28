@@ -152,6 +152,75 @@ export async function persistAppTurn(
   if (assistantText.trim()) await insert('assistant', assistantText.trim());
 }
 
+// ── Personal "Today's intention" (v2) ───────────────────────────────────────
+// One cached line per user, distilled from their recent app conversation. The
+// table is ensured lazily so no separate migration step is needed.
+let _intentionTableReady = false;
+async function ensureIntentionTable(): Promise<void> {
+  if (_intentionTableReady) return;
+  const sql = db();
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_intention (
+      user_id uuid PRIMARY KEY,
+      intention text NOT NULL DEFAULT '',
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `;
+  _intentionTableReady = true;
+}
+
+export async function getUserIntention(
+  userId: string,
+): Promise<{ text: string; updatedAt: Date } | null> {
+  await ensureIntentionTable();
+  const sql = db();
+  const rows = await sql<Array<{ intention: string; updated_at: Date }>>`
+    SELECT intention, updated_at FROM user_intention WHERE user_id = ${userId} LIMIT 1
+  `;
+  if (!rows.length) return null;
+  return { text: rows[0].intention, updatedAt: rows[0].updated_at };
+}
+
+export async function setUserIntention(userId: string, text: string): Promise<void> {
+  await ensureIntentionTable();
+  const sql = db();
+  await sql`
+    INSERT INTO user_intention (user_id, intention, updated_at)
+    VALUES (${userId}, ${text}, now())
+    ON CONFLICT (user_id) DO UPDATE SET intention = EXCLUDED.intention, updated_at = now()
+  `;
+}
+
+/** Timestamp of the user's most recent app-companion message (or null). */
+export async function lastAppMessageAt(userId: string): Promise<Date | null> {
+  const sql = db();
+  const rows = await sql<Array<{ at: Date | null }>>`
+    SELECT max(m.created_at) AS at
+    FROM messages m JOIN chats c ON c.id = m.chat_id
+    WHERE c.user_id = ${userId} AND c.title = ${APP_CHAT_TITLE}
+  `;
+  return rows[0]?.at ?? null;
+}
+
+/** The user's most recent app-companion turns, oldest-first, as {role, text}. */
+export async function loadRecentAppMessages(
+  userId: string,
+  limit = 16,
+): Promise<Array<{ role: string; text: string }>> {
+  const sql = db();
+  const rows = await sql<Array<{ role: string; text: string | null }>>`
+    SELECT m.role, (m.parts->0->>'text') AS text
+    FROM messages m JOIN chats c ON c.id = m.chat_id
+    WHERE c.user_id = ${userId} AND c.title = ${APP_CHAT_TITLE}
+    ORDER BY m.created_at DESC
+    LIMIT ${limit}
+  `;
+  return rows
+    .map((r) => ({ role: r.role, text: (r.text ?? '').trim() }))
+    .filter((r) => r.text)
+    .reverse();
+}
+
 export async function searchDocs(
   queryEmbedding: number[],
   k = 6,
