@@ -86,6 +86,43 @@ function buildWheelBlock(scores: Record<string, number>): string {
   return `\n\nBALANCE WHEEL™ ASSESSMENT (from her intake — private, never mention this to her):\n${lines.join('\n')}\nHer primary growth edge right now: **${lowestLabel}** (${lowestVal}/5). Let this shape how you open and what you prioritize — without stating it explicitly.`;
 }
 
+type AppContext = {
+  clips?: Array<{ id: string; title: string; cat: string; len: number; description?: string }>;
+  journalTemplates?: Array<{ id: string; title: string; promptCount: number }>;
+  resources?: Array<{ id: string; title: string; type: string }>;
+  features?: Array<{ name: string; label: string; desc: string }>;
+};
+
+function buildAppContextBlock(ctx: AppContext): string {
+  const lines: string[] = ['\n\nAPP FEATURES MARY CAN RECOMMEND'];
+  lines.push('Add at most ONE action tag on its own line at the very end of your response. Only when it genuinely fits — never force it.');
+
+  if (ctx.clips?.length) {
+    lines.push('\nLIBRARY CLIPS (video/audio):');
+    ctx.clips.forEach(c =>
+      lines.push(`${c.id} | ${c.title} | ${c.cat} | ${c.len} min${c.description ? ' | ' + c.description : ''}`)
+    );
+  }
+  if (ctx.journalTemplates?.length) {
+    lines.push('\nJOURNAL TEMPLATES (guided writing prompts):');
+    ctx.journalTemplates.forEach(t => lines.push(`${t.id} | ${t.title} | ${t.promptCount} prompts`));
+  }
+  if (ctx.resources?.length) {
+    lines.push('\nSHARED DOCUMENTS (from Mary):');
+    ctx.resources.forEach(r => lines.push(`${r.id} | ${r.title} | ${r.type}`));
+  }
+  if (ctx.features?.length) {
+    lines.push('\nAPP FEATURES:');
+    ctx.features.forEach(f => lines.push(`${f.name} | ${f.label} | ${f.desc}`));
+  }
+  lines.push('\nAction tag format — pick exactly one when relevant:');
+  lines.push('[CLIP:clip_id]         — play a video or audio class');
+  lines.push('[JOURNAL:template_id]  — open a journal with this template');
+  lines.push('[RESOURCE:resource_id] — view a document shared by Mary');
+  lines.push('[FEATURE:feature_name] — navigate to an app feature (bloom-checkin | daily-reset | library)');
+  return lines.join('\n');
+}
+
 export async function POST(req: Request) {
   // — Auth: embed key check —
   const embedKey = req.headers.get('x-embed-key');
@@ -99,14 +136,19 @@ export async function POST(req: Request) {
     message,
     wheelScores,
     accessToken,
-    clipCatalog,
+    appContext,
   }: {
     transcript: string;
     message: string;
     sessionId?: string;
     wheelScores?: Record<string, number>;
     accessToken?: string;
-    clipCatalog?: Array<{ id: string; title: string; cat: string; len: number; description?: string }>;
+    appContext?: {
+      clips?: Array<{ id: string; title: string; cat: string; len: number; description?: string }>;
+      journalTemplates?: Array<{ id: string; title: string; promptCount: number }>;
+      resources?: Array<{ id: string; title: string; type: string }>;
+      features?: Array<{ name: string; label: string; desc: string }>;
+    };
   } = await req.json();
 
   if (!message?.trim()) {
@@ -135,13 +177,9 @@ export async function POST(req: Request) {
 
   const wheelBlock = wheelScores ? buildWheelBlock(wheelScores) : '';
 
-  const clipBlock = clipCatalog?.length
-    ? '\n\nLIBRARY CLIPS YOU CAN RECOMMEND (from Mary\'s actual video library):\n' +
-      clipCatalog.map(c => `${c.id} | ${c.title} | ${c.cat} | ${c.len} min${c.description ? ' | ' + c.description : ''}`).join('\n') +
-      '\n\nIf one of these clips would genuinely serve this person right now, add this on its own line at the very end of your response (after all sentences):\n[CLIP:clip_id]\nUse the exact ID. One clip only. Only when it naturally fits — if nothing fits, leave it out entirely.'
-    : '';
+  const appBlock = appContext ? buildAppContextBlock(appContext) : '';
 
-  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + clipBlock + styleDirective;
+  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + appBlock + styleDirective;
 
   // — Build conversation messages from the plain-text transcript —
   // transcript format: "Mary: ...\nGuest: ...\n..."
