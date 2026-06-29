@@ -95,14 +95,15 @@ type AppContext = {
 };
 
 const PRONOUN_DIRECTIVES: Record<string, string> = {
-  'she/her':   'Refer to the user with she/her pronouns.',
-  'he/him':    'Refer to the user with he/him pronouns.',
-  'they/them': 'Refer to the user with they/them pronouns — avoid gendered terms.',
+  'she/her':   'this user uses she/her pronouns — refer to her as she/her.',
+  'he/him':    'this user uses he/him pronouns — refer to him as he/him, and use masculine or neutral nouns (e.g. "man" or "person", never "woman"). Never call this user a woman, "she", or "her".',
+  'they/them': 'this user uses they/them pronouns — refer to them as they/them and avoid all gendered nouns ("woman"/"man") and gendered pronouns ("she"/"he").',
 };
 
 function buildPronounBlock(pronouns: string): string {
   const directive = PRONOUN_DIRECTIVES[pronouns];
-  return directive ? `\n\nPRONOUN PREFERENCE: ${directive}` : '';
+  if (!directive) return '';
+  return `\n\nPRONOUN PREFERENCE — CRITICAL, OVERRIDES ALL WORDING ABOVE: The persona and context above default to feminine language ("woman", "women", "she", "her") for the audience, but ${directive} Apply this to everything you write for this user — your replies, reflections, identity words, and any affirmations — regardless of the default gendered wording in these instructions or any gendered language earlier in the conversation.`;
 }
 
 function buildAppContextBlock(ctx: AppContext): string {
