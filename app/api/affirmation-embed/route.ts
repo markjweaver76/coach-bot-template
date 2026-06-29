@@ -21,6 +21,8 @@ Read the conversation and identify:
 
 Write a 3-line affirmation — personal, powerful, first person ("I am…", "I trust…", "I choose…"). Each line stands alone and lands like a truth they already know but needed to hear again.
 
+Do NOT assume the speaker's gender from the conversation. Unless a PRONOUN PREFERENCE below says otherwise, use gender-neutral identity language — never gendered nouns like "daughter", "woman", "sister", "goddess", "queen", "mother". Prefer neutral words ("person", "soul", "child", "human") or simply omit a gendered noun.
+
 Also identify:
 - theme: one short phrase (e.g. "releasing people-pleasing", "trusting the void")
 - identityWord: one word they are becoming (e.g. "sovereign", "magnetic", "light", "free")
@@ -29,15 +31,15 @@ Respond ONLY with valid JSON:
 { "lines": ["...", "...", "..."], "theme": "...", "identityWord": "..." }`;
 
 const PRONOUN_DIRECTIVES: Record<string, string> = {
-  'she/her':   'The person uses she/her pronouns.',
-  'he/him':    'The person uses he/him pronouns.',
-  'they/them': 'The person uses they/them pronouns — avoid gendered terms.',
+  'she/her':   'The speaker uses she/her pronouns — feminine identity nouns (e.g. "daughter", "woman") are appropriate.',
+  'he/him':    'The speaker uses he/him pronouns — use he/him and masculine or neutral identity nouns (e.g. "son", "man", "person"). NEVER use feminine words like "daughter", "woman", "she", or "her" for the speaker.',
+  'they/them': 'The speaker uses they/them pronouns — use they/them and strictly gender-neutral nouns; avoid "daughter"/"son", "woman"/"man", "she"/"he".',
 };
 
 function buildPronounBlock(pronouns?: string): string {
   const directive = pronouns ? PRONOUN_DIRECTIVES[pronouns] : '';
   return directive
-    ? `\n\nPRONOUN PREFERENCE: ${directive} Honor this in any themes, identity words, and framing — never default to gendered ("woman"/"she") language.`
+    ? `\n\nPRONOUN PREFERENCE — CRITICAL: ${directive} The conversation may contain feminine wording from the coach; ignore that when choosing the speaker's pronouns and identity nouns. Honor this in every line, the theme, and the identityWord.`
     : '';
 }
 
