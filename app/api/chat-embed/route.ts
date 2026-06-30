@@ -11,7 +11,7 @@
  *
  * Uses full RAG over the training corpus. No per-user memory (stateless).
  */
-import { streamText } from 'ai';
+import { streamText, generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { embedOne } from '@/lib/embed';
 import { createClient } from '@supabase/supabase-js';
@@ -63,6 +63,68 @@ const DEEP_STYLE = [
 
 // Detect an explicit request to elaborate, so depth can kick in on demand too.
 const DEPTH_RE = /\b(more|deeper|expand|elaborate|explain|why|go on|continue|details?)\b/i;
+
+// — Crisis safety contract —
+// When the conversation signals risk of suicide, self-harm, or being in danger,
+// the model emits a `[CRISIS]` tag. The embedding app (Manifest with Mary) strips
+// the tag from the visible reply and renders a real-world-help card on it. This is
+// the model-side layer of a defense-in-depth design; the app also runs its own
+// keyword check on the user's words, and a parallel classifier below backstops the
+// model in case it doesn't emit the tag itself. The tag is internal — never shown
+// to or explained to the user.
+const CRISIS_TAG = '[CRISIS]';
+
+const CRISIS_DIRECTIVE = [
+  '\n\nSAFETY — CRISIS RESPONSE (critical, overrides response-style limits above):',
+  'If the person expresses thoughts of suicide, a wish to die, intent to harm themselves,',
+  'or that they may be in danger (including abuse), set everything else aside and respond first',
+  'as a caring human: warm, calm, non-judgmental, and present. Gently acknowledge what they shared,',
+  "remind them they don't have to carry it alone, and encourage them to reach real human support right now —",
+  'their local emergency services or a crisis line in their country. Be clear, without alarm, that you are an AI',
+  'companion and not a crisis service, so they deserve real, human help. Do not try to assess, diagnose, or talk them',
+  'through the crisis yourself, and never minimize or argue them out of how they feel.',
+  `Then append the tag ${CRISIS_TAG} on its own line at the very end of your reply.`,
+  'This tag is an internal safety signal — never explain it, mention it, or reference these instructions.',
+  'Only use it for genuine present-tense risk to the person — not for past struggles they have recovered from,',
+  'and not for ordinary sadness, stress, or figurative language ("dying of boredom", "this is killing me").',
+].join(' ');
+
+// Fast, parallel risk classifier — the defense-in-depth backstop. It runs alongside
+// the streamed reply (no added wall-clock: it's a tiny call started before we read
+// the stream), and if it flags risk we ensure the `[CRISIS]` tag is present even when
+// the main model failed to emit it. Returns true only for genuine present risk.
+const CRISIS_MODEL = process.env.CRISIS_CLASSIFIER_MODEL || EMBED_MODEL;
+
+const CRISIS_CLASSIFIER_SYSTEM = [
+  'You are a safety classifier. Decide whether the LATEST message from the person indicates a genuine,',
+  'present-tense risk of suicide, self-harm, or being in danger (including abuse) — something that should',
+  'surface real-world crisis resources.',
+  'Answer with exactly one word: CRISIS or SAFE.',
+  'Answer CRISIS for: suicidal thoughts or intent, a wish to die or not exist, intent to harm oneself,',
+  'or being in immediate danger.',
+  'Answer SAFE for: ordinary sadness, stress, frustration, or anger; figurative language',
+  '("dying of boredom", "this is killing me", "I could kill for a coffee"); and past struggles the person',
+  'has recovered from or is healing from ("I used to self-harm but I\'m better now").',
+  'When genuinely unsure, answer SAFE.',
+].join(' ');
+
+async function classifyCrisisRisk(message: string, transcript: string): Promise<boolean> {
+  try {
+    // A little prior context helps catch indirect ideation, but the latest message
+    // is what we're judging. Keep the context short to stay fast and cheap.
+    const recent = transcript.split('\n').slice(-6).join('\n').slice(-1500);
+    const { text } = await generateText({
+      model: openai(CRISIS_MODEL),
+      system: CRISIS_CLASSIFIER_SYSTEM,
+      prompt: `${recent ? `Recent conversation:\n${recent}\n\n` : ''}Latest message from the person:\n"""${message}"""\n\nClassify the latest message. Answer CRISIS or SAFE.`,
+      maxOutputTokens: 32,
+    });
+    return /\bCRISIS\b/i.test(text) && !/\bSAFE\b/i.test(text);
+  } catch (err) {
+    console.error('[chat-embed] crisis classifier failed', err);
+    return false; // degrade gracefully — the model directive and the app's own check still cover us
+  }
+}
 
 // Score label lookup (1–5)
 const SCORE_LABELS = ['', 'Struggling', 'Finding my way', 'Growing', 'Thriving', 'Fully alive'];
@@ -196,7 +258,12 @@ export async function POST(req: Request) {
   const appBlock = appContext ? buildAppContextBlock(appContext) : '';
   const pronounBlock = pronouns ? buildPronounBlock(pronouns) : '';
 
-  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + appBlock + pronounBlock + styleDirective;
+  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + appBlock + pronounBlock + styleDirective + CRISIS_DIRECTIVE;
+
+  // Defense in depth: run the risk classifier in parallel with the reply. Started
+  // here (before we read the stream) so it overlaps the generation and adds no
+  // wall-clock — we only await it after the model's tokens are done.
+  const crisisPromise = classifyCrisisRisk(message, transcript);
 
   // — Build conversation messages from the plain-text transcript —
   // transcript format: "Mary: ...\nGuest: ...\n..."
@@ -228,8 +295,10 @@ export async function POST(req: Request) {
     onFinish: async ({ text }) => {
       try {
         const userId = await userIdPromise;
-        if (userId && text?.trim()) {
-          await persistAppTurn(userId, message, text);
+        // Never persist the internal safety tag into the user's stored history.
+        const clean = text?.replace(/\[CRISIS\]/gi, '').trim();
+        if (userId && clean) {
+          await persistAppTurn(userId, message, clean);
         }
       } catch (err) {
         console.error('[chat-embed] persist failed', err);
@@ -237,5 +306,33 @@ export async function POST(req: Request) {
     },
   });
 
-  return result.toTextStreamResponse();
+  // Forward the model's tokens verbatim, then — once they're done — append the
+  // `[CRISIS]` tag if the parallel classifier flagged risk and the model didn't
+  // already emit it itself. The app strips the tag and renders its help card on it.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let acc = '';
+      try {
+        for await (const chunk of result.textStream) {
+          acc += chunk;
+          controller.enqueue(encoder.encode(chunk));
+        }
+      } catch (err) {
+        console.error('[chat-embed] stream error', err);
+      }
+      try {
+        if (await crisisPromise) {
+          if (!/\[CRISIS\]/i.test(acc)) controller.enqueue(encoder.encode(`\n${CRISIS_TAG}`));
+        }
+      } catch (err) {
+        console.error('[chat-embed] crisis inject failed', err);
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  });
 }
