@@ -6,7 +6,7 @@
  *
  * What it does:
  *   1. Enables the pgvector extension
- *   2. Creates the `chats`, `messages`, `documents`, `user_memory` tables
+ *   2. Creates the `chats`, `messages`, `documents`, `user_memory`, `user_intention` tables
  *   3. Sets up Row Level Security policies (users can only see their own data)
  *   4. Creates the `match_documents` RPC for vector similarity search
  *
@@ -32,6 +32,7 @@ await sql`DROP TABLE IF EXISTS messages CASCADE`;
 await sql`DROP TABLE IF EXISTS chats CASCADE`;
 await sql`DROP TABLE IF EXISTS documents CASCADE`;
 await sql`DROP TABLE IF EXISTS user_memory CASCADE`;
+await sql`DROP TABLE IF EXISTS user_intention CASCADE`;
 
 console.log('3/4 Creating schema + RLS policies...');
 
@@ -96,6 +97,20 @@ await sql`CREATE INDEX user_memory_embedding_idx ON user_memory USING hnsw (embe
 await sql`ALTER TABLE user_memory ENABLE ROW LEVEL SECURITY`;
 await sql`CREATE POLICY "user_memory: owner can read" ON user_memory FOR SELECT TO authenticated USING (auth.uid() = user_id)`;
 await sql`CREATE POLICY "user_memory: owner can insert" ON user_memory FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id)`;
+
+// Personal "Today's intention" — one cached line per user. Also created lazily at
+// runtime by lib/db.ts; defined here so a fresh project gets it (with RLS) up front.
+await sql`
+  CREATE TABLE user_intention (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    intention TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+`;
+await sql`ALTER TABLE user_intention ENABLE ROW LEVEL SECURITY`;
+await sql`CREATE POLICY "user_intention: owner can read" ON user_intention FOR SELECT TO authenticated USING (auth.uid() = user_id)`;
+await sql`CREATE POLICY "user_intention: owner can insert" ON user_intention FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id)`;
+await sql`CREATE POLICY "user_intention: owner can update" ON user_intention FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id)`;
 
 console.log('4/4 Creating match_documents RPC...');
 await sql`

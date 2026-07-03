@@ -166,6 +166,19 @@ async function ensureIntentionTable(): Promise<void> {
       updated_at timestamptz NOT NULL DEFAULT now()
     )
   `;
+  // Row-Level Security: this table lives in the `public` schema and is therefore
+  // reachable through the project's PostgREST API with the anon key. Without RLS,
+  // anyone with the project URL could read or modify every user's intention. The
+  // app server connects as the table owner via DATABASE_URL (which bypasses RLS),
+  // so enabling it here only locks down the public API path. Statements are
+  // idempotent so this stays safe to run on every cold start.
+  await sql`ALTER TABLE user_intention ENABLE ROW LEVEL SECURITY`;
+  await sql`DROP POLICY IF EXISTS "user_intention: owner can read" ON user_intention`;
+  await sql`CREATE POLICY "user_intention: owner can read" ON user_intention FOR SELECT TO authenticated USING (auth.uid() = user_id)`;
+  await sql`DROP POLICY IF EXISTS "user_intention: owner can insert" ON user_intention`;
+  await sql`CREATE POLICY "user_intention: owner can insert" ON user_intention FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id)`;
+  await sql`DROP POLICY IF EXISTS "user_intention: owner can update" ON user_intention`;
+  await sql`CREATE POLICY "user_intention: owner can update" ON user_intention FOR UPDATE TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id)`;
   _intentionTableReady = true;
 }
 
