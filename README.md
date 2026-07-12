@@ -89,6 +89,32 @@ Re-run any time your corpus changes substantially. Most coaches can't articulate
 
 You can still hand-tweak `BRAND.personaPrompt` after the script runs if anything feels off.
 
+### 6d. (Optional) Ingest external blog content the bot may cite
+
+The bot can surface published blog posts as education/guidance in chat — the same way it recommends a class — and link them. Sources are configured in `lib/blog-sources.ts` (a feed URL, or a crawlable blog); this template ships with the Tropical Refuge journal and the Eminence Organics blog.
+
+```bash
+bun run ingest-blog            # all sources
+bun run ingest-blog eminence   # one source by key
+bun run ingest-blog --dry      # discover only, don't write
+```
+
+Each post is stored in the RAG corpus keyed on its **public URL**, which is what makes it linkable. The retriever mixes these with your private training docs, but the system prompt keeps them separate: private docs are never revealed, while blog posts land in a "Further Reading" block the bot may share (at most one per reply, links quoted verbatim — it can't invent URLs). Re-run any time the source blogs publish new posts (e.g. on a schedule or at deploy).
+
+To add your own source, append an entry to `BLOG_SOURCES` in `lib/blog-sources.ts` and re-run.
+
+### 6e. (Optional) See where members hit content gaps
+
+When a member asks about something the corpus barely covers (weak retrieval match), the query is logged to a `content_gaps` table. Turn that log into blog topic ideas:
+
+```bash
+bun run content-gaps                 # last 30 days → clustered topic suggestions
+bun run content-gaps --days=60
+bun run content-gaps --raw           # just the top under-served queries
+```
+
+The report clusters gaps into proposed posts mapped to the blog's categories/tags and prints a markdown block ready to paste into `blog-agent/TOPIC-BACKLOG.md` in the tropicalrefuge repo, so the blog agent can pick them up.
+
 ### 7. Run locally
 ```bash
 bun run dev

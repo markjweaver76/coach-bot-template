@@ -9,6 +9,7 @@ import {
 } from '@/lib/db';
 import { buildSystemPrompt } from '@/lib/system-prompt';
 import { extractAndStoreFacts } from '@/lib/memory';
+import { maybeRecordContentGap } from '@/lib/content-gaps';
 import { sendSessionSummary } from '@/lib/session-summary';
 import { getJourney, detectAndUpdatePhase, detectAndSetHomework } from '@/lib/journey';
 import { getIntake } from '@/lib/intake';
@@ -47,6 +48,12 @@ export async function POST(req: Request) {
       searchDocs(queryEmbeddingResult, 6),
       searchUserMemory(user.id, queryEmbeddingResult, 5),
     ]);
+    // Log a content gap when the best retrieval match is weak — fuels blog topics.
+    void maybeRecordContentGap({
+      query: lastUserText,
+      topSimilarity: docHits[0]?.similarity ?? 0,
+      channel: 'web',
+    });
   }
 
   const system = buildSystemPrompt({

@@ -17,6 +17,11 @@ function db() {
   return _sql;
 }
 
+/** Shared Postgres pool, for modules that need raw access (e.g. content-gaps). */
+export function getSql() {
+  return db();
+}
+
 export type ChatListItem = {
   id: string;
   title: string;

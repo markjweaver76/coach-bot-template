@@ -17,6 +17,7 @@ import { embedOne } from '@/lib/embed';
 import { createClient } from '@supabase/supabase-js';
 import { searchDocs, persistAppTurn } from '@/lib/db';
 import { buildSystemPrompt } from '@/lib/system-prompt';
+import { maybeRecordContentGap } from '@/lib/content-gaps';
 
 export const maxDuration = 60;
 
@@ -92,6 +93,8 @@ type AppContext = {
   resources?: Array<{ id: string; title: string; type: string }>;
   features?: Array<{ name: string; label: string; desc: string }>;
   rituals?: Array<{ key: string; label: string; blurb?: string; len?: number }>;
+  /** Retail + bookable-service destinations (e.g. the Shop and Book tabs). */
+  commerce?: Array<{ key: string; label: string; desc: string }>;
 };
 
 const PRONOUN_DIRECTIVES: Record<string, string> = {
@@ -170,7 +173,11 @@ function buildAppContextBlock(ctx: AppContext): string {
     lines.push('\nSHORT RITUALS (a brief guided session to do together — suggest one when the user names a feeling or moment it would soothe, e.g. anxiety, exhaustion, before a hard conversation):');
     ctx.rituals.forEach(r => lines.push(`${r.key} | ${r.label}${r.len ? ' | ' + r.len + ' min' : ''}${r.blurb ? ' | ' + r.blurb : ''}`));
   }
-  lines.push('\nAction tag format — pick exactly one when relevant:');
+  if (ctx.commerce?.length) {
+    lines.push('\nSTUDIO SHOP & BOOKING (retail products and bookable studio services — this is the LAST resort, offered only when genuinely applicable and only after you have given real guidance; see the ordering rules below):');
+    ctx.commerce.forEach(c => lines.push(`${c.key} | ${c.label} | ${c.desc}`));
+  }
+  lines.push('\nAction tag format — pick at most one when relevant:');
   lines.push('[CLIP:clip_id]         — play a video or audio class');
   lines.push('[JOURNAL:template_id]  — open a journal with this template');
   lines.push('[RESOURCE:resource_id] — view a document shared by Mary');
@@ -178,8 +185,25 @@ function buildAppContextBlock(ctx: AppContext): string {
   if (ctx.rituals?.length) {
     lines.push('[RITUAL:ritual_key]    — begin a short ritual together (use the key from the list above)');
   }
+  if (ctx.commerce?.length) {
+    lines.push(`[NAV:destination]      — open a shop/booking tab (use the key: ${ctx.commerce.map(c => c.key).join(' | ')})`);
+  }
   return lines.join('\n');
 }
+
+// The progression the bot follows when deciding what (if anything) to surface:
+// talk first, teach second, sell last. Keeps recommendations from crowding out
+// the coaching and from arriving before the member is ready.
+const RECOMMENDATION_LADDER = [
+  '\n\nWHAT TO OFFER, AND WHEN — a strict progression that protects the experience:',
+  '1) GUIDANCE FIRST. Every reply leads with real coaching in your own words: meet her, reflect back, offer insight or a small practice. This is the substance — a link or a card is never a substitute for it. On the OPENING reply, give guidance only: no links, no cards.',
+  '2) EDUCATION NEXT. Once the conversation has some depth and it would genuinely deepen her understanding, you may weave in ONE educational article from FURTHER READING (share the link naturally). Only if it truly fits — otherwise keep coaching.',
+  '3) RETAIL / SERVICES LAST, and only if applicable. When what she shares clearly maps to a product or a bookable studio service, you may point her to ONE — and only after guidance (usually after education too):',
+  '   • Shop — skincare/retail she asks about or would clearly benefit from → [NAV:shop]',
+  '   • Book — to book a studio service (facial, reiki, sound bath, mentoring) → [NAV:book]',
+  '   Never lead with this, never upsell, never mention price. Hold it until the moment is right; if she is only venting or exploring, do not offer it at all.',
+  'HARD RULE: at most ONE recommendation per reply — a single blog link OR a single card/tag, never several and never both. If more than one could fit, pick the single best next step and do not jump ahead of where the conversation actually is.',
+].join('\n');
 
 export async function POST(req: Request) {
   // — Auth: embed key check —
@@ -225,6 +249,12 @@ export async function POST(req: Request) {
   try {
     const queryEmbedding = await embedOne(message);
     docHits = await searchDocs(queryEmbedding, 6);
+    // Log a content gap when the best retrieval match is weak — fuels blog topics.
+    void maybeRecordContentGap({
+      query: message,
+      topSimilarity: docHits[0]?.similarity ?? 0,
+      channel: 'embed',
+    });
   } catch {
     // Non-fatal — proceed without context
   }
@@ -239,10 +269,16 @@ export async function POST(req: Request) {
   const wheelBlock = wheelScores ? buildWheelBlock(wheelScores) : '';
   const appBlock = appContext ? buildAppContextBlock(appContext) : '';
   const pronounBlock = pronouns ? buildPronounBlock(pronouns) : '';
+  // The recommendation ladder only kicks in once there's an app/commerce or blog
+  // surface to offer; blog links (Further Reading) are held back on the opening
+  // reply so the first exchange is pure guidance.
+  const ladderBlock = appBlock || wantsDepth ? RECOMMENDATION_LADDER : '';
   const entryBlock = entry ? buildEntryBlock(entry) : '';
   const absolutionBlock = buildAbsolutionBlock(season, absolutionShown);
 
-  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + appBlock + pronounBlock + entryBlock + absolutionBlock + styleDirective;
+  const system =
+    buildSystemPrompt({ contextChunks: docHits, userFacts: [], includeFurtherReading: wantsDepth }) +
+    wheelBlock + appBlock + ladderBlock + pronounBlock + entryBlock + absolutionBlock + styleDirective;
 
   // — Build conversation messages from the plain-text transcript —
   // transcript format: "Mary: ...\nGuest: ...\n..."

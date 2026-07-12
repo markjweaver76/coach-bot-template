@@ -32,6 +32,7 @@ await sql`DROP TABLE IF EXISTS messages CASCADE`;
 await sql`DROP TABLE IF EXISTS chats CASCADE`;
 await sql`DROP TABLE IF EXISTS documents CASCADE`;
 await sql`DROP TABLE IF EXISTS user_memory CASCADE`;
+await sql`DROP TABLE IF EXISTS content_gaps CASCADE`;
 
 console.log('3/4 Creating schema + RLS policies...');
 
@@ -96,6 +97,20 @@ await sql`CREATE INDEX user_memory_embedding_idx ON user_memory USING hnsw (embe
 await sql`ALTER TABLE user_memory ENABLE ROW LEVEL SECURITY`;
 await sql`CREATE POLICY "user_memory: owner can read" ON user_memory FOR SELECT TO authenticated USING (auth.uid() = user_id)`;
 await sql`CREATE POLICY "user_memory: owner can insert" ON user_memory FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id)`;
+
+// Content gaps — topics members asked about that the corpus barely covered.
+// Written server-side (bypasses RLS via the direct connection); no user reads.
+await sql`
+  CREATE TABLE content_gaps (
+    id BIGSERIAL PRIMARY KEY,
+    query TEXT NOT NULL,
+    top_similarity REAL NOT NULL DEFAULT 0,
+    channel TEXT NOT NULL DEFAULT 'web',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+`;
+await sql`CREATE INDEX content_gaps_created_at_idx ON content_gaps (created_at DESC)`;
+await sql`ALTER TABLE content_gaps ENABLE ROW LEVEL SECURITY`;
 
 console.log('4/4 Creating match_documents RPC...');
 await sql`
