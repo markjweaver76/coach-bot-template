@@ -106,6 +106,31 @@ function buildPronounBlock(pronouns: string): string {
   return `\n\nPRONOUN PREFERENCE — CRITICAL, OVERRIDES ALL WORDING ABOVE: The persona and context above default to feminine language ("woman", "women", "she", "her") for the audience, but ${directive} Apply this to everything you write for this user — your replies, reflections, identity words, and any affirmations — regardless of the default gendered wording in these instructions or any gendered language earlier in the conversation.`;
 }
 
+// Onboarding absolution context (Refuge redesign, onboarding copy spec §R2): the
+// user named her "season" and has already received an absolution moment that relieved
+// guilt/shame. Mary must not re-trigger it.
+const SEASON_NAMES: Record<string, string> = {
+  divorce: 'divorce or separation',
+  loss: 'loss or grief',
+  parenting: 'parenting',
+  caregiving: 'caregiving',
+  burnout: 'burnout',
+};
+function buildAbsolutionBlock(season?: string, absolutionShown?: boolean): string {
+  if (!absolutionShown && !season) return '';
+  const parts = ['\n\nONBOARDING CONTEXT (private — never quote or restate this to the user):'];
+  const name = season ? SEASON_NAMES[season] : null;
+  if (name) parts.push(`She arrived naming her season: ${name}.`);
+  if (absolutionShown) {
+    parts.push(
+      'She has already been given an "absolution" moment that relieved guilt and shame.',
+      'Do NOT re-trigger guilt: never ask why she waited to care for herself, never imply fault or that anything is broken or needs fixing, and do not use "should".',
+      'Open with warmth and permission, meet her exactly where she is, and offer one small step — validate first, advice later.',
+    );
+  }
+  return parts.join(' ');
+}
+
 // Beauty on-ramp (Refuge redesign W2): a user who arrived through the skin/beauty
 // door. Mary should lead with the body and skin, never open with divorce/grief/crisis.
 function buildEntryBlock(entry: string): string {
@@ -172,6 +197,8 @@ export async function POST(req: Request) {
     appContext,
     pronouns,
     entry,
+    season,
+    absolutionShown,
   }: {
     transcript: string;
     message: string;
@@ -181,6 +208,8 @@ export async function POST(req: Request) {
     appContext?: AppContext;
     pronouns?: string;
     entry?: string;
+    season?: string;
+    absolutionShown?: boolean;
   } = await req.json();
 
   if (!message?.trim()) {
@@ -211,8 +240,9 @@ export async function POST(req: Request) {
   const appBlock = appContext ? buildAppContextBlock(appContext) : '';
   const pronounBlock = pronouns ? buildPronounBlock(pronouns) : '';
   const entryBlock = entry ? buildEntryBlock(entry) : '';
+  const absolutionBlock = buildAbsolutionBlock(season, absolutionShown);
 
-  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + appBlock + pronounBlock + entryBlock + styleDirective;
+  const system = buildSystemPrompt({ contextChunks: docHits, userFacts: [] }) + wheelBlock + appBlock + pronounBlock + entryBlock + absolutionBlock + styleDirective;
 
   // — Build conversation messages from the plain-text transcript —
   // transcript format: "Mary: ...\nGuest: ...\n..."
