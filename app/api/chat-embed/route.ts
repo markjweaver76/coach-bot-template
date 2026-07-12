@@ -1,6 +1,6 @@
 /**
  * /api/chat-embed — server-to-server chat endpoint for embedded integrations
- * (e.g. the Manifest with Mary SLP calling from its Express proxy).
+ * (e.g. the Refuge with Mary app calling from its Express proxy).
  *
  * Auth: `x-embed-key` header must match EMBED_SECRET env var.
  * No Supabase user required — designed for guest/anonymous sessions.
@@ -109,6 +109,44 @@ function buildPronounBlock(pronouns: string): string {
   return `\n\nPRONOUN PREFERENCE — CRITICAL, OVERRIDES ALL WORDING ABOVE: The persona and context above default to feminine language ("woman", "women", "she", "her") for the audience, but ${directive} Apply this to everything you write for this user — your replies, reflections, identity words, and any affirmations — regardless of the default gendered wording in these instructions or any gendered language earlier in the conversation.`;
 }
 
+// Onboarding absolution context (Refuge redesign, onboarding copy spec §R2): the
+// user named her "season" and has already received an absolution moment that relieved
+// guilt/shame. Mary must not re-trigger it.
+const SEASON_NAMES: Record<string, string> = {
+  divorce: 'divorce or separation',
+  loss: 'loss or grief',
+  parenting: 'parenting',
+  caregiving: 'caregiving',
+  burnout: 'burnout',
+};
+function buildAbsolutionBlock(season?: string, absolutionShown?: boolean): string {
+  if (!absolutionShown && !season) return '';
+  const parts = ['\n\nONBOARDING CONTEXT (private — never quote or restate this to the user):'];
+  const name = season ? SEASON_NAMES[season] : null;
+  if (name) parts.push(`She arrived naming her season: ${name}.`);
+  if (absolutionShown) {
+    parts.push(
+      'She has already been given an "absolution" moment that relieved guilt and shame.',
+      'Do NOT re-trigger guilt: never ask why she waited to care for herself, never imply fault or that anything is broken or needs fixing, and do not use "should".',
+      'Open with warmth and permission, meet her exactly where she is, and offer one small step — validate first, advice later.',
+    );
+  }
+  return parts.join(' ');
+}
+
+// Beauty on-ramp (Refuge redesign W2): a user who arrived through the skin/beauty
+// door. Mary should lead with the body and skin, never open with divorce/grief/crisis.
+function buildEntryBlock(entry: string): string {
+  if (entry !== 'beauty') return '';
+  return [
+    '\n\nENTRY PATH — beauty/skin door (important):',
+    'This person arrived through a lower-shame beauty on-ramp — their skin or body is what brought them in.',
+    'Lead with the body and skin. Do NOT open with divorce, grief, or crisis language, and do not ask them to name a crisis.',
+    'Beauty is the hook; a gentle nervous-system reset is the promise. Offer one small, kind step (e.g. a calm-skin reset).',
+    'Sell calm, not cures: say "supports" or "soothes" — never "treats", "clears", or "anti-ages". Make no medical or dermatological claims.',
+  ].join(' ');
+}
+
 function buildAppContextBlock(ctx: AppContext): string {
   const lines: string[] = ['\n\nAPP FEATURES MARY CAN RECOMMEND'];
   lines.push('Add at most ONE action tag on its own line at the very end of your response. Only when it genuinely fits — never force it.');
@@ -182,6 +220,9 @@ export async function POST(req: Request) {
     accessToken,
     appContext,
     pronouns,
+    entry,
+    season,
+    absolutionShown,
   }: {
     transcript: string;
     message: string;
@@ -190,6 +231,9 @@ export async function POST(req: Request) {
     accessToken?: string;
     appContext?: AppContext;
     pronouns?: string;
+    entry?: string;
+    season?: string;
+    absolutionShown?: boolean;
   } = await req.json();
 
   if (!message?.trim()) {
@@ -229,10 +273,12 @@ export async function POST(req: Request) {
   // surface to offer; blog links (Further Reading) are held back on the opening
   // reply so the first exchange is pure guidance.
   const ladderBlock = appBlock || wantsDepth ? RECOMMENDATION_LADDER : '';
+  const entryBlock = entry ? buildEntryBlock(entry) : '';
+  const absolutionBlock = buildAbsolutionBlock(season, absolutionShown);
 
   const system =
     buildSystemPrompt({ contextChunks: docHits, userFacts: [], includeFurtherReading: wantsDepth }) +
-    wheelBlock + appBlock + ladderBlock + pronounBlock + styleDirective;
+    wheelBlock + appBlock + ladderBlock + pronounBlock + entryBlock + absolutionBlock + styleDirective;
 
   // — Build conversation messages from the plain-text transcript —
   // transcript format: "Mary: ...\nGuest: ...\n..."
