@@ -17,6 +17,7 @@ import { embedOne } from '@/lib/embed';
 import { createClient } from '@supabase/supabase-js';
 import { searchDocs, persistAppTurn } from '@/lib/db';
 import { buildSystemPrompt } from '@/lib/system-prompt';
+import { maybeRecordContentGap } from '@/lib/content-gaps';
 
 export const maxDuration = 60;
 
@@ -181,6 +182,12 @@ export async function POST(req: Request) {
   try {
     const queryEmbedding = await embedOne(message);
     docHits = await searchDocs(queryEmbedding, 6);
+    // Log a content gap when the best retrieval match is weak — fuels blog topics.
+    void maybeRecordContentGap({
+      query: message,
+      topSimilarity: docHits[0]?.similarity ?? 0,
+      channel: 'embed',
+    });
   } catch {
     // Non-fatal — proceed without context
   }

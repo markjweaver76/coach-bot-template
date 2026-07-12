@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "ingest": "tsx scripts/ingest.ts",
+    "ingest-blog": "tsx scripts/ingest-blog.ts",
+    "content-gaps": "tsx scripts/content-gaps.ts",
     "transcribe": "tsx scripts/transcribe.ts",
     "derive-persona": "tsx scripts/derive-persona.ts",
     "provision-supabase": "tsx scripts/provision-supabase.ts",

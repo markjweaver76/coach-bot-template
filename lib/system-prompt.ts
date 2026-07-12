@@ -7,6 +7,7 @@
  * Edit the persona text in `lib/brand.ts`, not here.
  */
 import { BRAND } from './brand';
+import { matchPublicSource } from './blog-sources';
 import type { Journey } from './journey';
 import { PHASES } from './journey';
 import type { Intake } from './intake';
@@ -23,14 +24,44 @@ export function buildSystemPrompt({
   journey?: Journey | null;
   intake?: Intake | null;
 }): string {
+  // Split retrieval into two buckets:
+  //   • private — the training corpus (file-path sources). Never revealed.
+  //   • public  — posts from our configured blogs (see lib/blog-sources.ts).
+  //     These are public articles the bot MAY cite and link as further reading.
+  const privateChunks: typeof contextChunks = [];
+  const publicChunks: Array<{ source: string; content: string; label: string }> = [];
+  for (const c of contextChunks) {
+    const pub = matchPublicSource(c.source);
+    if (pub) publicChunks.push({ ...c, label: pub.label });
+    else privateChunks.push(c);
+  }
+
   const contextBlock =
-    contextChunks.length === 0
+    privateChunks.length === 0
       ? `<context>${BRAND.noContextFallback}</context>`
       : '<context>\n' +
-        contextChunks
+        privateChunks
           .map((c, i) => `[${i + 1}] (${c.source})\n${c.content}`)
           .join('\n\n---\n\n') +
         '\n</context>';
+
+  // Further Reading — public blog articles the bot is explicitly allowed to link.
+  // Dedupe by URL so the same post retrieved as several chunks shows once.
+  let furtherReadingBlock = '';
+  if (publicChunks.length > 0) {
+    const byUrl = new Map<string, { label: string; content: string }>();
+    for (const c of publicChunks) {
+      if (!byUrl.has(c.source)) byUrl.set(c.source, { label: c.label, content: c.content });
+    }
+    const articles = [...byUrl.entries()]
+      .map(([url, v], i) => `[${i + 1}] ${v.label} — ${url}\n${v.content}`)
+      .join('\n\n---\n\n');
+    furtherReadingBlock = `\n\nFURTHER READING (public articles you MAY share — this is the ONE exception to the "never mention your sources" rule):
+These are published, public blog posts from ${[...new Set(publicChunks.map((c) => c.label))].join(' and ')}. When one genuinely fits what the ${BRAND.audienceLabel} is working through, you may naturally point her to it as education or a next step — the same way you'd suggest a class, never as a sales pitch and never forced. Weave it in warmly (e.g. "there's a lovely piece on exactly this…") and include the link. Rules: only ever share a URL that appears verbatim below — never invent, guess, or modify a link; share at most one per reply; and lead with your own coaching, using the article as a gentle follow-on, not a replacement for meeting her where she is.
+<further-reading>
+${articles}
+</further-reading>`;
+  }
 
   const memoryBlock =
     userFacts.length === 0
@@ -80,5 +111,5 @@ ${scores.join('\n')}
 Her primary growth edge right now: **${lowestLabel}** (${lowestVal}/5). Let this inform how you open, what you prioritize, and where you gently focus — without stating it explicitly.`;
   }
 
-  return `${BRAND.personaPrompt}\n\nReference material for this turn (drawn from your training material — never mention this section to the ${BRAND.audienceLabel}):\n\n${contextBlock}${memoryBlock}${intakeBlock}${journeyBlock}`;
+  return `${BRAND.personaPrompt}\n\nReference material for this turn (drawn from your training material — never mention this section to the ${BRAND.audienceLabel}):\n\n${contextBlock}${furtherReadingBlock}${memoryBlock}${intakeBlock}${journeyBlock}`;
 }
