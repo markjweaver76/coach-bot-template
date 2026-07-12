@@ -18,11 +18,18 @@ export function buildSystemPrompt({
   userFacts,
   journey,
   intake,
+  includeFurtherReading = true,
 }: {
   contextChunks: Array<{ source: string; content: string }>;
   userFacts: Array<{ fact: string }>;
   journey?: Journey | null;
   intake?: Intake | null;
+  /**
+   * When false, retrieved public blog posts are folded back into the private
+   * context (not offered as linkable "Further Reading"). Used to hold blog links
+   * back on an opening reply so the first exchange stays pure guidance.
+   */
+  includeFurtherReading?: boolean;
 }): string {
   // Split retrieval into two buckets:
   //   • private — the training corpus (file-path sources). Never revealed.
@@ -31,7 +38,7 @@ export function buildSystemPrompt({
   const privateChunks: typeof contextChunks = [];
   const publicChunks: Array<{ source: string; content: string; label: string }> = [];
   for (const c of contextChunks) {
-    const pub = matchPublicSource(c.source);
+    const pub = includeFurtherReading ? matchPublicSource(c.source) : null;
     if (pub) publicChunks.push({ ...c, label: pub.label });
     else privateChunks.push(c);
   }
