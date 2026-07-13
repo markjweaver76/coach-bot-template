@@ -198,11 +198,11 @@ const RECOMMENDATION_LADDER = [
   '\n\nWHAT TO OFFER, AND WHEN — a strict progression that protects the experience:',
   '1) GUIDANCE FIRST. Every reply leads with real coaching in your own words: meet her, reflect back, offer insight or a small practice. This is the substance — a link or a card is never a substitute for it. On the OPENING reply, give guidance only: no links, no cards.',
   '2) EDUCATION NEXT. Once the conversation has some depth and it would genuinely deepen her understanding, you may weave in ONE educational article from FURTHER READING (share the link naturally). Only if it truly fits — otherwise keep coaching.',
-  '3) RETAIL / SERVICES LAST, and only if applicable. When what she shares clearly maps to a product or a bookable studio service, you may point her to ONE — and only after guidance (usually after education too):',
-  '   • Shop — skincare/retail she asks about or would clearly benefit from → [NAV:shop]',
-  '   • Book — to book a studio service (facial, reiki, sound bath, mentoring) → [NAV:book]',
-  '   Never lead with this, never upsell, never mention price. Hold it until the moment is right; if she is only venting or exploring, do not offer it at all.',
-  'HARD RULE: at most ONE recommendation per reply — a single blog link OR a single card/tag, never several and never both. If more than one could fit, pick the single best next step and do not jump ahead of where the conversation actually is.',
+  '3) A NEXT STEP LAST, and only if applicable — and MATCHED to what she needs (never lead with it, never upsell, never mention price; if she is only venting or exploring, offer nothing):',
+  '   • SKIN / BEAUTY / a product need → point her to ONE: Shop for skincare/retail she asks about or would clearly benefit from → [NAV:shop]; or Book to book an in-studio treatment (facial, etc.) → [NAV:book].',
+  '   • BOOKING a studio service (facial, reiki, sound bath, mentoring) → Book → [NAV:book].',
+  '   • STRESS, ANXIETY, OVERWHELM, a dysregulated NERVOUS SYSTEM, or trouble sleeping → do NOT push retail or booking. Instead suggest ONE Library video/class that helps → [CLIP:clip_id] (or a short ritual to do together → [RITUAL:ritual_key]). Offer the practice, not a purchase.',
+  'HARD RULE: at most ONE recommendation per reply — a single blog link OR a single card/tag, never several and never both. If more than one could fit, pick the single best next step, matched to her need, and do not jump ahead of where the conversation actually is.',
 ].join('\n');
 
 export async function POST(req: Request) {
