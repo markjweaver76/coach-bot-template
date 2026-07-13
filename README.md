@@ -99,6 +99,20 @@ bun run ingest-blog eminence   # one source by key
 bun run ingest-blog --dry      # discover only, don't write
 ```
 
+**No local secrets? Ingest from inside the deployment instead.** `/api/ingest-blog`
+runs the same ingest using the app's own runtime env, so you never copy
+`DATABASE_URL`/`OPENAI_API_KEY` out to a CI runner (handy when they're stored as
+write-only "sensitive" platform secrets). Set `INGEST_TOKEN` (a value you choose)
+in your env, then:
+
+```
+GET /api/ingest-blog?token=YOURTOKEN                      # all sources (max 25 each)
+GET /api/ingest-blog?token=YOURTOKEN&source=eminence&max=80
+```
+
+`vercel.json` also schedules a weekly Cron that hits this endpoint — set
+`CRON_SECRET` (a value you choose) to authenticate those scheduled runs.
+
 Each post is stored in the RAG corpus keyed on its **public URL**, which is what makes it linkable. The retriever mixes these with your private training docs, but the system prompt keeps them separate: private docs are never revealed, while blog posts land in a "Further Reading" block the bot may share (at most one per reply, links quoted verbatim — it can't invent URLs). Re-run any time the source blogs publish new posts (e.g. on a schedule or at deploy).
 
 To add your own source, append an entry to `BLOG_SOURCES` in `lib/blog-sources.ts` and re-run.
