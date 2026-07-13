@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/ingest-blog?source=tropical-refuge", "schedule": "0 8 * * 1" },
+    { "path": "/api/ingest-blog?source=eminence&max=40", "schedule": "15 8 * * 1" }
+  ]
+}
