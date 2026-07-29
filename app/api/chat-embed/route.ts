@@ -147,6 +147,16 @@ function buildEntryBlock(entry: string): string {
   ].join(' ');
 }
 
+// Cohort challenge day-awareness (Refuge "Regulated & Radiant Reset"): when the
+// caller is an active member, Mary is told the day + theme so she can reference it
+// warmly without lecturing. One short line — deliberately low-pressure.
+function buildChallengeBlock(challenge?: { day?: number; theme?: string; name?: string }): string {
+  if (!challenge || !challenge.day) return '';
+  const program = challenge.name || 'Radiant Reset';
+  const themePart = challenge.theme ? ` Today's theme is ${challenge.theme}.` : '';
+  return `\n\nCHALLENGE CONTEXT (private — do not recite verbatim): This member is on Day ${challenge.day} of the ${program}.${themePart} You may reference it warmly if it fits the moment; do not lecture, quiz them on it, or force it into the reply.`;
+}
+
 function buildAppContextBlock(ctx: AppContext): string {
   const lines: string[] = ['\n\nAPP FEATURES MARY CAN RECOMMEND'];
   lines.push('Add at most ONE action tag on its own line at the very end of your response. Only when it genuinely fits — never force it.');
@@ -223,6 +233,7 @@ export async function POST(req: Request) {
     entry,
     season,
     absolutionShown,
+    challenge,
   }: {
     transcript: string;
     message: string;
@@ -234,6 +245,7 @@ export async function POST(req: Request) {
     entry?: string;
     season?: string;
     absolutionShown?: boolean;
+    challenge?: { day?: number; theme?: string; name?: string };
   } = await req.json();
 
   if (!message?.trim()) {
@@ -275,10 +287,11 @@ export async function POST(req: Request) {
   const ladderBlock = appBlock || wantsDepth ? RECOMMENDATION_LADDER : '';
   const entryBlock = entry ? buildEntryBlock(entry) : '';
   const absolutionBlock = buildAbsolutionBlock(season, absolutionShown);
+  const challengeBlock = buildChallengeBlock(challenge);
 
   const system =
     buildSystemPrompt({ contextChunks: docHits, userFacts: [], includeFurtherReading: wantsDepth }) +
-    wheelBlock + appBlock + ladderBlock + pronounBlock + entryBlock + absolutionBlock + styleDirective;
+    wheelBlock + appBlock + ladderBlock + pronounBlock + entryBlock + absolutionBlock + challengeBlock + styleDirective;
 
   // — Build conversation messages from the plain-text transcript —
   // transcript format: "Mary: ...\nGuest: ...\n..."
