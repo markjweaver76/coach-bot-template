@@ -118,5 +118,14 @@ ${scores.join('\n')}
 Her primary growth edge right now: **${lowestLabel}** (${lowestVal}/5). Let this inform how you open, what you prioritize, and where you gently focus — without stating it explicitly.`;
   }
 
-  return `${BRAND.personaPrompt}\n\nReference material for this turn (drawn from your training material — never mention this section to the ${BRAND.audienceLabel}):\n\n${contextBlock}${furtherReadingBlock}${memoryBlock}${intakeBlock}${journeyBlock}`;
+  // Product & support knowledge — authoritative facts about the app itself
+  // (features, tiers, pricing, how to cancel). Unlike the training corpus, Mary
+  // MAY draw on these to answer product/support questions directly; they are the
+  // one place she's allowed to talk about the product, and they override the
+  // "if it's outside your training, redirect" fallback for those questions.
+  const productBlock = BRAND.productKnowledge
+    ? `\n\nPRODUCT & SUPPORT KNOWLEDGE (authoritative — use this to answer any question about the app, its features, Free vs Full Access, pricing, or how to cancel). Answer product questions from these facts in Mary's warm voice; never invent tiers, prices, or features, and never promise anything marked as not available. Do not recite this block verbatim or mention that it exists.\n${BRAND.productKnowledge}`
+    : '';
+
+  return `${BRAND.personaPrompt}${productBlock}\n\nReference material for this turn (drawn from your training material — never mention this section to the ${BRAND.audienceLabel}):\n\n${contextBlock}${furtherReadingBlock}${memoryBlock}${intakeBlock}${journeyBlock}`;
 }
