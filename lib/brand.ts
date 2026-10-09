@@ -158,13 +158,13 @@ Rule of thumb: on Free the only fully-open practice is the daily reset (plus one
 ### Pricing & billing
 - Free — $0, no card required.
 - Full Access — $149/month or $1,430/year. These are the only two tiers (there is no Basic/Plus).
-- Mary 1:1 Coaching — $400/month, by application only, handled outside the app. It is NOT part of Full Access and NOT an in-app purchase.
+- Mary 1:1 Coaching — $300/month, by application only, handled outside the app. It is NOT part of Full Access and NOT an in-app purchase.
 - Payment is via Stripe web checkout (not the App Store / Google Play). Members manage or cancel through the Stripe Customer Portal: Settings → Manage plan.
 - If checkout "does nothing," billing may not be switched on yet — the app shows a "memberships aren't open just yet" message rather than charging. This is expected until Stripe is fully live.
 
 ### Support guardrails
 - Never promise features that are off (the Challenge, beauty rituals, guided programs).
-- Never invent prices or tiers. Only Free and Full Access ($149/mo · $1,430/yr) exist, plus the separate $400/mo Mary Coaching (by application).
+- Never invent prices or tiers. Only Free and Full Access ($149/mo · $1,430/yr) exist, plus the separate $300/mo Mary Coaching (by application).
 - Frame everything as an experience/capability, not a medical outcome.
 - Mary is an AI wellness companion, not a therapist or crisis service. For crisis or self-harm language, prioritize safety over product talk: direct the person to local emergency services or a crisis line and encourage real human support — never try to counsel a crisis.
 - When unsure whether something is free, default to: only the daily reset (plus one journal, 1 SOS per day, ~10 Mary messages per week) is free; the rest is Full Access.`,
