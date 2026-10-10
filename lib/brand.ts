@@ -111,13 +111,13 @@ After question 5 is answered, close with a personalized 3-line intention spoken 
 
   /**
    * PRODUCT & SUPPORT KNOWLEDGE — the source-of-truth facts about the app
-   * itself (what it is, its tabs/features, Free vs Full Access, pricing, how
+   * itself (what it is, its tabs/features, plans (Breathe / Restore / Reclaim), pricing, how
    * to cancel). This is separate from `personaPrompt`: the persona is HOW Mary
    * speaks; this is WHAT is true about the product. It's injected into every
    * turn's system prompt so Mary can answer support questions correctly
    * without inventing tiers, prices, or features.
    *
-   * Keep this in sync with the live app. Last updated: 2026-08-11.
+   * Keep this in sync with the live app. Last updated: 2026-10-10.
    * Leave as '' if your bot has no product to describe.
    */
   productKnowledge: `### About the app
@@ -143,31 +143,37 @@ Always describe capabilities and experiences, never health outcomes or medical c
 - Files from Mary — program guides / homework Mary shares appear in the "Files & Journal" screen.
 Not currently available — do NOT promise these; if asked, say they aren't available right now: the cohort Challenge (paused), beauty rituals (Calm-Skin / Glow-Down), and standalone guided programs.
 
-### Free vs Full Access
-Free ($0, no card required):
-- Daily reset — yes (the one fully-open free practice).
-- Chat with Mary — about 10 messages per week.
-- SOS reset — 1 per day.
-- Journal — one free journal (the first prompt set); write as many entries in it as you like.
-- Files from Mary & saved conversations — viewable.
-- Library, "What today needs" recovery tracks, Sleep Sanctuary, and all other prompt sets — locked; these are Full Access.
-Full Access ($149/month or $1,430/year — annual ≈ 20% off vs $1,788; no contract, cancel anytime):
-- Everything in Free, plus the entire Library, the Sleep Sanctuary, all journals/prompt sets, unlimited SOS resets, and unlimited chat with Mary.
-Rule of thumb: on Free the only fully-open practice is the daily reset (plus one journal, 1 SOS per day, ~10 Mary messages per week). Everything else in the Library is Full Access.
+### Plans: Breathe (free), Restore, Reclaim
+Breathe, the free plan ($0, no card required):
+- Daily reset, the one fully-open daily practice.
+- Three starter classes from the Library.
+- Chat with Mary, about 10 messages per week.
+- SOS reset, 1 per day.
+- Journal: one free journal (the first prompt set); write as many entries in it as you like.
+- Files from Mary and saved conversations, viewable.
+Restore ($39/month or $374/year, about $31 a month on annual; no contract, cancel anytime):
+- Everything in Breathe, plus a curated shelf of the Library (sound baths, rest practices and stretching), more time with Mary (about 40 messages per week), and unlimited SOS resets.
+- Not included: the Sleep Sanctuary, guided programs, and the other journals/prompt sets. Those are Reclaim.
+Reclaim ($149/month or $1,430/year, about $119 a month on annual; no contract, cancel anytime). Reclaim was formerly called Full Access:
+- Everything in Restore, plus the entire Library, every program and sleep series (the Sleep Sanctuary), all journals/prompt sets, unlimited chat with Mary, and first access to new practices.
+Rule of thumb: classes show a lock when they belong to a higher plan; tapping one shows which plan opens it. If unsure which plan includes a specific class, say the app shows it on the class itself rather than guessing.
 
 ### Pricing & billing
-- Free — $0, no card required.
-- Full Access — $149/month or $1,430/year. These are the only two tiers (there is no Basic/Plus).
-- Mary 1:1 Coaching — $300/month, by application only, handled outside the app. It is NOT part of Full Access and NOT an in-app purchase.
-- Payment is via Stripe web checkout (not the App Store / Google Play). Members manage or cancel through the Stripe Customer Portal: Settings → Manage plan.
-- If checkout "does nothing," billing may not be switched on yet — the app shows a "memberships aren't open just yet" message rather than charging. This is expected until Stripe is fully live.
+- Breathe: $0, no card required.
+- Restore: $39/month or $374/year.
+- Reclaim: $149/month or $1,430/year. If someone mentions Full Access, that is Reclaim's old name; same plan, same price.
+- These are the only three app plans.
+- Mary 1:1 Coaching: $300/month, by application only, handled outside the app. It is NOT part of any app plan and NOT an in-app purchase.
+- Payment is via Stripe web checkout (not the App Store / Google Play). Members change plans, update their card or cancel through the Stripe Customer Portal: Settings, then Manage plan.
+- If checkout "does nothing," the app shows a "memberships aren't open just yet" message rather than charging.
 
 ### Support guardrails
 - Never promise features that are off (the Challenge, beauty rituals, guided programs).
-- Never invent prices or tiers. Only Free and Full Access ($149/mo · $1,430/yr) exist, plus the separate $300/mo Mary Coaching (by application).
+- Never invent prices or plans. Only Breathe (free), Restore ($39/mo · $374/yr) and Reclaim ($149/mo · $1,430/yr) exist, plus the separate $300/mo Mary Coaching (by application).
+- Crisis and safety support is never tied to a plan. Never mention a plan, price or upgrade in a conversation about crisis or self-harm.
 - Frame everything as an experience/capability, not a medical outcome.
 - Mary is an AI wellness companion, not a therapist or crisis service. For crisis or self-harm language, prioritize safety over product talk: direct the person to local emergency services or a crisis line and encourage real human support — never try to counsel a crisis.
-- When unsure whether something is free, default to: only the daily reset (plus one journal, 1 SOS per day, ~10 Mary messages per week) is free; the rest is Full Access.`,
+- When unsure whether something is free, default to: the daily reset, three starter classes, one journal, 1 SOS per day and ~10 Mary messages per week are free; the rest needs Restore or Reclaim.`,
 
   /**
    * Singular noun for one member — used where grammar needs "this X" or "to the X".
